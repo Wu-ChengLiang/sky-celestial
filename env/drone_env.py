@@ -130,30 +130,57 @@ class DroneEnvironment(gym.Env):
             positions: 无人机库位置坐标数组
         """
         positions = []
-        attempts = 0
-        max_attempts = 1000
+        min_distance_degree = self.drone_radius / 111000 * 1.0  # 最小距离为无人机半径的1倍，转为度
         
         for _ in range(self.drone_num):
+            valid_position_found = False
             attempts = 0
-            while attempts < max_attempts:
+            max_attempts = 1000
+            
+            while not valid_position_found and attempts < max_attempts:
                 # 在边界范围内随机生成一个点
                 x = np.random.uniform(self.bounds[0], self.bounds[2])
                 y = np.random.uniform(self.bounds[1], self.bounds[3])
                 point = Point(x, y)
                 
                 # 检查点是否在区域内
-                if self.region_geometry.contains(point):
-                    positions.extend([x, y])
-                    break
-                attempts += 1
+                if not self.region_geometry.contains(point):
+                    attempts += 1
+                    continue
+                    
+                # 检查是否与现有点保持最小距离
+                if positions:  # 如果已经有点了
+                    too_close = False
+                    for i in range(0, len(positions), 2):
+                        existing_x, existing_y = positions[i], positions[i+1]
+                        distance = np.sqrt((x - existing_x)**2 + (y - existing_y)**2)
+                        if distance < min_distance_degree:
+                            too_close = True
+                            break
+                    
+                    if too_close:
+                        attempts += 1
+                        continue
+                
+                # 如果通过所有检查，添加这个点
+                positions.extend([x, y])
+                valid_position_found = True
             
             # 如果尝试次数过多，就在边界内随机取一点
-            if attempts >= max_attempts:
-                print("警告: 无法在区域内找到有效点，使用边界内随机点")
-                # 简单地使用边界内的一个点
-                centroid = self.region_geometry.centroid
-                positions.extend([centroid.x, centroid.y])
+            if not valid_position_found:
+                print(f"警告: 为第{len(positions)//2 + 1}个无人机找不到合适位置，使用区域内随机点")
+                while True:
+                    # 在边界范围内随机生成一个点
+                    x = np.random.uniform(self.bounds[0], self.bounds[2])
+                    y = np.random.uniform(self.bounds[1], self.bounds[3])
+                    point = Point(x, y)
+                    
+                    # 确保至少在区域内
+                    if self.region_geometry.contains(point):
+                        positions.extend([x, y])
+                        break
         
+        print(f"成功生成{len(positions)//2}个无人机位置")
         return np.array(positions, dtype=np.float32)
     
     def _compute_reward(self):
@@ -175,55 +202,101 @@ class DroneEnvironment(gym.Env):
         drone_radius_degree = self.drone_radius / 111000  # 转换为度
         drone_buffers = [point.buffer(drone_radius_degree) for point in drone_points]
         
-        # 合并所有覆盖范围
-        merged_buffer = None
-        if drone_buffers:
-            merged_buffer = drone_buffers[0]
-            for buffer in drone_buffers[1:]:
-                merged_buffer = merged_buffer.union(buffer)
+        try:
+            # 检查无人机库是否都在区域内
+            for i, point in enumerate(drone_points):
+                if not self.region_geometry.contains(point):
+                    print(f"警告: 无人机 {i+1} 不在区域边界内，坐标: {point.x}, {point.y}")
+            
+            # 合并所有覆盖范围
+            merged_buffer = None
+            if drone_buffers:
+                merged_buffer = drone_buffers[0]
+                for buffer in drone_buffers[1:]:
+                    merged_buffer = merged_buffer.union(buffer)
+            
+            # 计算覆盖重叠度
+            overlap_area = 0
+            for i in range(len(drone_buffers)):
+                for j in range(i + 1, len(drone_buffers)):
+                    try:
+                        intersection = drone_buffers[i].intersection(drone_buffers[j])
+                        if not intersection.is_empty:
+                            overlap_area += intersection.area
+                    except Exception as e:
+                        print(f"计算重叠区域时出错: {e}")
+            
+            # 计算与行政区域的交集面积
+            region_area = self.region_geometry.area
+            coverage_area = 0
+            
+            if merged_buffer and region_area > 0:
+                try:
+                    if isinstance(merged_buffer, MultiPolygon):
+                        coverage_area = sum(
+                            p.intersection(self.region_geometry).area 
+                            for p in merged_buffer.geoms 
+                            if not p.is_empty
+                        )
+                    else:
+                        intersection = merged_buffer.intersection(self.region_geometry)
+                        if not intersection.is_empty:
+                            coverage_area = intersection.area
+                except Exception as e:
+                    print(f"计算有效覆盖区域时出错: {e}")
+            
+            # 计算覆盖率
+            coverage_ratio = coverage_area / region_area if region_area > 0 else 0
+            
+            # 计算POI覆盖率
+            poi_covered = 0
+            for _, poi in self.poi_gdf.iterrows():
+                poi_point = poi.geometry
+                for buffer in drone_buffers:
+                    try:
+                        if buffer.contains(poi_point):
+                            poi_covered += 1
+                            break
+                    except Exception as e:
+                        print(f"计算POI覆盖时出错: {e}")
+            
+            poi_coverage_ratio = poi_covered / len(self.poi_gdf) if len(self.poi_gdf) > 0 else 0
+            
+            # 计算奖励值 (根据覆盖率和重叠度)
+            normalized_overlap = (overlap_area / region_area) if region_area > 0 else 0
+            
+            # 防止奖励值过大或过小
+            poi_term = poi_coverage_ratio * 0.7
+            area_term = coverage_ratio * 0.3
+            overlap_term = normalized_overlap * 0.5
+            
+            # 确保各项值在合理范围内
+            if np.isnan(poi_term) or np.isinf(poi_term):
+                print(f"警告: POI覆盖率计算异常: {poi_coverage_ratio}")
+                poi_term = 0
+            
+            if np.isnan(area_term) or np.isinf(area_term):
+                print(f"警告: 区域覆盖率计算异常: {coverage_ratio}")
+                area_term = 0
+            
+            if np.isnan(overlap_term) or np.isinf(overlap_term):
+                print(f"警告: 重叠度计算异常: {normalized_overlap}")
+                overlap_term = 0
+            
+            reward = poi_term + area_term - overlap_term
+            
+            # 添加额外检查，确保奖励值在合理范围内
+            if np.isnan(reward) or np.isinf(reward):
+                print(f"警告: 奖励值计算异常: {reward}，使用默认值0")
+                reward = 0
         
-        # 计算覆盖重叠度
-        overlap_area = 0
-        for i in range(len(drone_buffers)):
-            for j in range(i + 1, len(drone_buffers)):
-                intersection = drone_buffers[i].intersection(drone_buffers[j])
-                overlap_area += intersection.area
-        
-        # 计算与行政区域的交集面积
-        region_area = self.region_geometry.area
-        coverage_area = 0
-        
-        if merged_buffer:
-            if isinstance(merged_buffer, MultiPolygon):
-                coverage_area = sum(
-                    p.intersection(self.region_geometry).area 
-                    for p in merged_buffer.geoms 
-                    if not p.is_empty
-                )
-            else:
-                coverage_area = merged_buffer.intersection(self.region_geometry).area
-        
-        # 计算覆盖率
-        coverage_ratio = coverage_area / region_area if region_area > 0 else 0
-        
-        # 计算POI覆盖率
-        poi_covered = 0
-        for _, poi in self.poi_gdf.iterrows():
-            poi_point = poi.geometry
-            for buffer in drone_buffers:
-                if buffer.contains(poi_point):
-                    poi_covered += 1
-                    break
-        
-        poi_coverage_ratio = poi_covered / len(self.poi_gdf) if len(self.poi_gdf) > 0 else 0
-        
-        # 计算奖励值 (根据覆盖率和重叠度)
-        normalized_overlap = (overlap_area / region_area) if region_area > 0 else 0
-        reward = (
-            poi_coverage_ratio * 0.7 +       # POI覆盖率权重0.7
-            coverage_ratio * 0.3 -           # 区域覆盖率权重0.3
-            normalized_overlap * 0.5         # 重叠度惩罚
-        )
+        except Exception as e:
+            print(f"计算奖励时发生严重错误: {e}")
+            reward = -10  # 出错时给予负面奖励
+            poi_coverage_ratio = 0
+            coverage_ratio = 0
+            normalized_overlap = 0
+            poi_covered = 0
         
         info = {
             'poi_coverage': poi_coverage_ratio,
@@ -233,7 +306,7 @@ class DroneEnvironment(gym.Env):
             'total_poi': len(self.poi_gdf),
             'drone_positions': drone_positions,
             'drone_buffers': drone_buffers,
-            'merged_buffer': merged_buffer
+            'merged_buffer': merged_buffer if 'merged_buffer' in locals() else None
         }
         
         return reward, info

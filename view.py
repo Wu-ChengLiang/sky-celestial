@@ -29,56 +29,99 @@ def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_pa
     drone_radius_degree = drone_radius / 111000  # 转为度
     
     # 绘制行政区域
-    gpd.GeoSeries([region_geometry]).plot(ax=ax, color='lightblue', edgecolor='blue', alpha=0.5, label='行政区域')
+    gpd.GeoSeries([region_geometry]).plot(ax=ax, color='lightblue', edgecolor='blue', alpha=0.5)
     
-    # 构建无人机点位
-    drone_points = [Point(pos[0], pos[1]) for pos in drone_positions]
-    drone_gdf = gpd.GeoDataFrame(geometry=drone_points)
+    # 检查drone_positions是否有效
+    if drone_positions is None or len(drone_positions) == 0:
+        print("警告: 无人机位置数据为空")
+        plt.title('无人机机库选址 (数据错误)')
+        if output_path:
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            plt.close()
+        else:
+            plt.show()
+        return
     
-    # 绘制无人机点位
-    drone_gdf.plot(ax=ax, color='green', markersize=50, marker='x', label='无人机点位')
-    
-    # 计算无人机覆盖范围
-    # 直接使用info中的buffers如果有的话
-    if info and 'drone_buffers' in info:
-        buffers = info['drone_buffers']
+    # 确保drone_positions的形状正确
+    if isinstance(drone_positions, np.ndarray) and drone_positions.ndim == 2:
+        drone_points = [Point(pos[0], pos[1]) for pos in drone_positions]
     else:
+        try:
+            # 尝试重塑数组
+            reshaped_positions = np.array(drone_positions).reshape(-1, 2)
+            drone_points = [Point(pos[0], pos[1]) for pos in reshaped_positions]
+            print(f"重塑无人机位置数据: {len(drone_points)}个点")
+        except Exception as e:
+            print(f"无法处理无人机位置数据: {e}")
+            drone_points = []
+    
+    # 使用传入的drone_buffers或计算新的
+    if info and 'drone_buffers' in info and info['drone_buffers']:
+        buffers = info['drone_buffers']
+        print(f"使用预计算的buffers: {len(buffers)}个")
+    else:
+        print(f"计算新的buffer，点数: {len(drone_points)}")
         buffers = [point.buffer(drone_radius_degree) for point in drone_points]
     
-    # 绘制所有缓冲区
-    gpd.GeoSeries(buffers).plot(ax=ax, color='red', alpha=0.3, label='无人机覆盖范围')
+    # 绘制每个无人机覆盖范围，使用不同的透明度
+    for i, buffer in enumerate(buffers):
+        # 使用不同颜色或不同透明度
+        alpha = 0.3
+        gpd.GeoSeries([buffer]).plot(ax=ax, color='red', alpha=alpha)
     
     # 绘制有效覆盖区域（与行政区域的交集）
-    # 使用info中的merged_buffer如果有的话
     merged_buffer = None
     if info and 'merged_buffer' in info:
         merged_buffer = info['merged_buffer']
     else:
         # 合并缓冲区
         if buffers:
-            merged_buffer = buffers[0]
-            for buffer in buffers[1:]:
-                merged_buffer = merged_buffer.union(buffer)
-                
+            try:
+                merged_buffer = buffers[0]
+                for buffer in buffers[1:]:
+                    merged_buffer = merged_buffer.union(buffer)
+            except Exception as e:
+                print(f"合并缓冲区时出错: {e}")
+    
     if merged_buffer:
-        if isinstance(merged_buffer, MultiPolygon):
-            intersected_polys = [p.intersection(region_geometry) for p in merged_buffer.geoms]
-            # 过滤掉空结果并确保都是Polygon或MultiPolygon
-            valid_polys = [p for p in intersected_polys if not p.is_empty and (isinstance(p, Polygon) or isinstance(p, MultiPolygon))]
-            if valid_polys:
-                if len(valid_polys) > 1:
-                    coverage_poly = MultiPolygon(valid_polys)
-                else:
-                    coverage_poly = valid_polys[0]
-                # 绘制有效覆盖区域
-                gpd.GeoSeries([coverage_poly]).plot(ax=ax, color='blue', alpha=0.5, label='有效覆盖区域')
-        else:
-            coverage_poly = merged_buffer.intersection(region_geometry)
-            if not coverage_poly.is_empty:
-                gpd.GeoSeries([coverage_poly]).plot(ax=ax, color='blue', alpha=0.5, label='有效覆盖区域')
+        try:
+            if isinstance(merged_buffer, MultiPolygon):
+                # 计算每个polygon与区域的交集
+                valid_polys = []
+                for p in merged_buffer.geoms:
+                    try:
+                        intersection = p.intersection(region_geometry)
+                        if not intersection.is_empty and (isinstance(intersection, Polygon) or isinstance(intersection, MultiPolygon)):
+                            valid_polys.append(intersection)
+                    except Exception as e:
+                        print(f"计算多边形交集时出错: {e}")
+                
+                if valid_polys:
+                    try:
+                        if len(valid_polys) > 1:
+                            coverage_poly = MultiPolygon(valid_polys)
+                        else:
+                            coverage_poly = valid_polys[0]
+                        # 绘制有效覆盖区域
+                        gpd.GeoSeries([coverage_poly]).plot(ax=ax, color='blue', alpha=0.5)
+                    except Exception as e:
+                        print(f"绘制有效覆盖区域时出错: {e}")
+            else:
+                try:
+                    coverage_poly = merged_buffer.intersection(region_geometry)
+                    if not coverage_poly.is_empty:
+                        gpd.GeoSeries([coverage_poly]).plot(ax=ax, color='blue', alpha=0.5)
+                except Exception as e:
+                    print(f"计算单一buffer交集时出错: {e}")
+        except Exception as e:
+            print(f"处理merged_buffer时出错: {e}")
+            
+    # 创建无人机点的GeoDataFrame并绘制
+    drone_gdf = gpd.GeoDataFrame(geometry=drone_points)
+    drone_gdf.plot(ax=ax, color='green', markersize=100, marker='x')
     
     # 绘制POI点位
-    poi_gdf.plot(ax=ax, color='purple', markersize=10, marker='o', label='POI点位')
+    poi_gdf.plot(ax=ax, color='purple', markersize=20, marker='o')
     
     # 添加图例
     legend_elements = [
@@ -97,12 +140,22 @@ def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_pa
     
     plt.title(f'无人机机库选址 (POI覆盖率: {coverage_ratio:.1f}%)')
     
+    # 添加坐标轴标签
+    plt.xlabel('经度')
+    plt.ylabel('纬度')
+    
+    # 将点的坐标添加为标签
+    for i, point in enumerate(drone_points):
+        plt.annotate(f"D{i+1}", xy=(point.x, point.y), xytext=(5, 5), 
+                     textcoords='offset points', fontsize=8)
+    
     # 添加覆盖信息文本
     info_text = (
         f'POI覆盖率: {coverage_ratio:.1f}%\n'
         f'区域覆盖率: {area_coverage:.1f}%\n'
         f'重叠率: {overlap_ratio:.1f}%\n'
-        f'覆盖POI点数: {info["poi_covered"] if info and "poi_covered" in info else 0}'
+        f'覆盖POI点数: {info["poi_covered"] if info and "poi_covered" in info else 0}\n'
+        f'无人机数量: {len(drone_points)}'
     )
     plt.annotate(info_text, xy=(0.02, 0.02), xycoords='axes fraction', 
                  bbox=dict(boxstyle="round,pad=0.5", fc="white", alpha=0.8))

@@ -6,6 +6,7 @@ from configs import Config
 from env import DroneEnvironment
 from models import PPO
 from view import visualize
+from shapely.geometry import Point
 
 def evaluate(model_path, num_episodes=10, render=True):
     """
@@ -39,11 +40,20 @@ def evaluate(model_path, num_episodes=10, render=True):
     
     # 开始评估
     for episode in range(num_episodes):
+        print(f"\n===== 开始评估第 {episode+1} 轮 =====")
+        
         # 重置环境
         state, _ = env.reset()
         episode_reward = 0
         done = False
         
+        # 打印初始状态信息
+        drone_positions = state.reshape(-1, 2)
+        print(f"初始无人机位置数量: {len(drone_positions)}")
+        for i, pos in enumerate(drone_positions):
+            print(f"  无人机 {i+1}: 经度={pos[0]:.6f}, 纬度={pos[1]:.6f}")
+        
+        steps = 0
         while not done:
             # 选择动作
             action, _, _ = agent.select_action(state)
@@ -55,6 +65,13 @@ def evaluate(model_path, num_episodes=10, render=True):
             # 更新状态
             state = next_state
             episode_reward += reward
+            steps += 1
+        
+        # 最终状态信息
+        final_positions = state.reshape(-1, 2)
+        print(f"完成步数: {steps}, 最终无人机位置数量: {len(final_positions)}")
+        for i, pos in enumerate(final_positions):
+            print(f"  无人机 {i+1}: 经度={pos[0]:.6f}, 纬度={pos[1]:.6f}")
         
         # 记录结果
         rewards.append(episode_reward)
@@ -66,9 +83,24 @@ def evaluate(model_path, num_episodes=10, render=True):
         
         # 渲染结果
         if render:
-            drone_positions = state.reshape(-1, 2)
-            output_path = os.path.join(config.VISUAL_DIR, f"eval_episode_{episode+1}.png")
-            visualize(env.region_geometry, env.poi_gdf, drone_positions, config.DRONE_RADIUS, output_path, info)
+            try:
+                # 使用最终状态渲染
+                drone_positions = state.reshape(-1, 2)
+                output_path = os.path.join(config.VISUAL_DIR, f"eval_episode_{episode+1}.png")
+                
+                # 检查无人机位置是否在区域内
+                in_region_count = 0
+                for pos in drone_positions:
+                    if env.region_geometry.contains(Point(pos[0], pos[1])):
+                        in_region_count += 1
+                
+                print(f"无人机在区域内的数量: {in_region_count}/{len(drone_positions)}")
+                
+                # 增加渲染信息
+                print(f"开始生成可视化结果，无人机数量: {len(drone_positions)}")
+                visualize(env.region_geometry, env.poi_gdf, drone_positions, config.DRONE_RADIUS, output_path, info)
+            except Exception as e:
+                print(f"渲染出错: {e}")
     
     # 打印平均结果
     avg_reward = np.mean(rewards)
