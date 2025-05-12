@@ -332,9 +332,10 @@ class DroneEnvironment(gym.Env):
             normalized_overlap = (overlap_area / region_area) if region_area > 0 else 0
             
             # 防止奖励值过大或过小
-            poi_term = poi_coverage_ratio * 0.7
+            #这里可以自定义惩罚系数
+            poi_term = poi_coverage_ratio * 1
             area_term = coverage_ratio * 0.3
-            overlap_term = normalized_overlap * 0.5
+            overlap_term = normalized_overlap * 0.1
             
             # 确保各项值在合理范围内
             if np.isnan(poi_term) or np.isinf(poi_term):
