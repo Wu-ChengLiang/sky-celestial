@@ -120,38 +120,44 @@ class DroneEnvironment(gym.Env):
         """
         self.current_step += 1
         
-        # 确保动作在有效范围内，并限制变化幅度
-        # 首先将动作重塑为n个无人机的坐标
+        # 将当前状态和动作重塑为n个无人机的坐标
         action_reshaped = action.reshape(-1, 2)
-        state_reshaped = self.state.reshape(-1, 2)
+        current_state = self.state.reshape(-1, 2)
         
-        # 对每个无人机分别进行处理
-        for i in range(len(action_reshaped)):
-            # 确保坐标在边界内
-            action_reshaped[i, 0] = np.clip(action_reshaped[i, 0], self.bounds[0], self.bounds[2])  # 经度
-            action_reshaped[i, 1] = np.clip(action_reshaped[i, 1], self.bounds[1], self.bounds[3])  # 纬度
-            
-            # 检查是否所有无人机坐标都相同 (模型崩溃的情况)
-            if i > 0 and np.allclose(action_reshaped[i], action_reshaped[0], atol=1e-5):
-                print(f"警告: 无人机 {i+1} 的坐标与无人机1相同，进行随机扰动")
-                # 添加随机扰动
-                action_reshaped[i, 0] += np.random.uniform(-0.01, 0.01)
-                action_reshaped[i, 1] += np.random.uniform(-0.01, 0.01)
-                
-                # 再次确保在边界内
-                action_reshaped[i, 0] = np.clip(action_reshaped[i, 0], self.bounds[0], self.bounds[2])
-                action_reshaped[i, 1] = np.clip(action_reshaped[i, 1], self.bounds[1], self.bounds[3])
+        # 探索参数
+        exploration_noise = max(0.1, 0.5 * (1 - self.current_step / self.max_steps))  # 递减的探索噪声
+        step_size = 0.005  # 每步动作的最大变化幅度（经纬度单位）
         
-        # 将处理后的动作重新展平
-        processed_action = action_reshaped.flatten()
+        # 创建新的状态数组，用于增量更新
+        new_state = np.copy(current_state)
         
-        # 应用动作，更新无人机库位置
-        self.state = processed_action
+        # 修改后的主动分散逻辑
+        for i in range(len(new_state)):
+            for j in range(i):
+                if np.linalg.norm(new_state[i] - new_state[j]) < 0.001:
+                    # 添加扰动
+                    new_state[i, 0] += np.random.uniform(-0.01, 0.01)
+                    new_state[i, 1] += np.random.uniform(-0.01, 0.01)
+                    
+                    # ✅ 强制裁剪（使用 np.clip 的精确计算）
+                    new_state[i, 0] = np.clip(
+                        new_state[i, 0], 
+                        np.float32(self.bounds[0]),  # 保持数据类型一致
+                        np.float32(self.bounds[2])
+                    )
+                    new_state[i, 1] = np.clip(
+                        new_state[i, 1],
+                        np.float32(self.bounds[1]),
+                        np.float32(self.bounds[3])
+                    )
+                    break
+        
+        # 将处理后的状态重新展平
+        self.state = new_state.flatten()
         
         # 检查是否所有点都有效
         valid_positions = 0
-        drone_positions = self.state.reshape(-1, 2)
-        for pos in drone_positions:
+        for pos in new_state:
             point = Point(pos[0], pos[1])
             if self.region_geometry.contains(point):
                 valid_positions += 1

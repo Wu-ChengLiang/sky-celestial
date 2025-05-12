@@ -60,7 +60,20 @@ class PPO:
             action, log_prob, _ = self.actor.sample(state)
             value = self.critic(state)
         
-        return action.cpu().numpy()[0], log_prob.cpu().item(), value.cpu().item()
+        # 添加额外的探索噪声，随着训练进行逐渐减小
+        action_np = action.cpu().numpy()[0]
+        
+        # 计算探索衰减因子 (随着训练步数增加，探索减少)
+        exploration_decay = max(0.05, 0.3 - 0.0001 * self.total_steps)  # 最小保留5%的探索
+        
+        # 添加正态分布噪声
+        if np.random.random() < exploration_decay:
+            # 噪声幅度也随着训练逐渐减小
+            noise_scale = max(0.001, 0.01 * (1.0 - self.total_steps / 10000))
+            noise = np.random.normal(0, noise_scale, size=action_np.shape)
+            action_np = action_np + noise
+        
+        return action_np, log_prob.cpu().item(), value.cpu().item()
     
     def evaluate_actions(self, states, actions):
         """

@@ -38,7 +38,11 @@ class ActorNetwork(nn.Module):
         x = F.relu(self.fc1(state))
         x = F.relu(self.fc2(x))
         mu = self.mu(x)
-        sigma = F.softplus(self.sigma(x)) + 1e-3  # 确保方差为正
+        
+        # 提高sigma的下限，使其不至于太小，从而保持足够的探索
+        # 这样能防止策略过早收敛到局部最优解
+        sigma_min = 0.01  # 最小标准差
+        sigma = F.softplus(self.sigma(x)) + sigma_min
         
         return mu, sigma
     
