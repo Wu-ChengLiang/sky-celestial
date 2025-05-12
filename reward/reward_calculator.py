@@ -18,9 +18,9 @@ class RewardCalculator:
         self.drone_radius = config.DRONE_RADIUS
         
         # 权重配置
-        self.poi_weight = 0.7  # POI覆盖率权重
-        self.area_weight = 0.3  # 区域覆盖率权重
-        self.overlap_penalty = 0.5  # 重叠惩罚系数
+        self.poi_weight = 0.1  # POI覆盖率权重
+        self.area_weight = 0.1  # 区域覆盖率权重
+        self.overlap_penalty = 0.1  # 重叠惩罚系数
         
     def calculate(self, drone_positions, region_geometry, poi_gdf):
         """

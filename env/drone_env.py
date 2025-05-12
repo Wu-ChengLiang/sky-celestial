@@ -81,7 +81,24 @@ class DroneEnvironment(gym.Env):
             np.random.seed(seed)
         
         # 随机初始化无人机库位置 (确保在区域内)
-        self.state = self._generate_random_positions()
+        positions = self._generate_random_positions()
+        
+        # 验证生成的位置
+        positions_2d = positions.reshape(-1, 2)
+        print(f"重置环境，生成{len(positions_2d)}个无人机位置")
+        in_region_count = 0
+        for i, pos in enumerate(positions_2d):
+            point = Point(pos[0], pos[1])
+            if self.region_geometry.contains(point):
+                in_region_count += 1
+                print(f"  无人机 {i+1}: 经度={pos[0]:.6f}, 纬度={pos[1]:.6f} (在区域内)")
+            else:
+                print(f"  无人机 {i+1}: 经度={pos[0]:.6f}, 纬度={pos[1]:.6f} (在区域外!)")
+        
+        if in_region_count < self.drone_num:
+            print(f"警告: 只有{in_region_count}/{self.drone_num}个无人机在区域内")
+        
+        self.state = positions
         self.current_step = 0
         
         info = {}
@@ -103,15 +120,45 @@ class DroneEnvironment(gym.Env):
         """
         self.current_step += 1
         
-        # 确保动作在有效范围内
-        action = np.clip(
-            action,
-            [self.bounds[0], self.bounds[1]] * self.drone_num,
-            [self.bounds[2], self.bounds[3]] * self.drone_num
-        )
+        # 确保动作在有效范围内，并限制变化幅度
+        # 首先将动作重塑为n个无人机的坐标
+        action_reshaped = action.reshape(-1, 2)
+        state_reshaped = self.state.reshape(-1, 2)
+        
+        # 对每个无人机分别进行处理
+        for i in range(len(action_reshaped)):
+            # 确保坐标在边界内
+            action_reshaped[i, 0] = np.clip(action_reshaped[i, 0], self.bounds[0], self.bounds[2])  # 经度
+            action_reshaped[i, 1] = np.clip(action_reshaped[i, 1], self.bounds[1], self.bounds[3])  # 纬度
+            
+            # 检查是否所有无人机坐标都相同 (模型崩溃的情况)
+            if i > 0 and np.allclose(action_reshaped[i], action_reshaped[0], atol=1e-5):
+                print(f"警告: 无人机 {i+1} 的坐标与无人机1相同，进行随机扰动")
+                # 添加随机扰动
+                action_reshaped[i, 0] += np.random.uniform(-0.01, 0.01)
+                action_reshaped[i, 1] += np.random.uniform(-0.01, 0.01)
+                
+                # 再次确保在边界内
+                action_reshaped[i, 0] = np.clip(action_reshaped[i, 0], self.bounds[0], self.bounds[2])
+                action_reshaped[i, 1] = np.clip(action_reshaped[i, 1], self.bounds[1], self.bounds[3])
+        
+        # 将处理后的动作重新展平
+        processed_action = action_reshaped.flatten()
         
         # 应用动作，更新无人机库位置
-        self.state = action
+        self.state = processed_action
+        
+        # 检查是否所有点都有效
+        valid_positions = 0
+        drone_positions = self.state.reshape(-1, 2)
+        for pos in drone_positions:
+            point = Point(pos[0], pos[1])
+            if self.region_geometry.contains(point):
+                valid_positions += 1
+        
+        if valid_positions == 0:
+            print("严重警告: 所有无人机点都在区域外，重新生成随机点")
+            self.state = self._generate_random_positions()
         
         # 计算奖励
         reward, info = self._compute_reward()
@@ -130,55 +177,70 @@ class DroneEnvironment(gym.Env):
             positions: 无人机库位置坐标数组
         """
         positions = []
-        min_distance_degree = self.drone_radius / 111000 * 1.0  # 最小距离为无人机半径的1倍，转为度
+        min_distance_degree = self.drone_radius / 111000 * 0.2  # 最小距离为无人机半径的20%，转为度
         
-        for _ in range(self.drone_num):
-            valid_position_found = False
-            attempts = 0
-            max_attempts = 1000
-            
-            while not valid_position_found and attempts < max_attempts:
-                # 在边界范围内随机生成一个点
+        # 获取区域内的随机点的备选方法
+        def get_random_point_in_region(max_attempts=100):
+            # 方法1: 边界框采样
+            for _ in range(max_attempts):
                 x = np.random.uniform(self.bounds[0], self.bounds[2])
                 y = np.random.uniform(self.bounds[1], self.bounds[3])
                 point = Point(x, y)
+                if self.region_geometry.contains(point):
+                    return [x, y]
                 
-                # 检查点是否在区域内
-                if not self.region_geometry.contains(point):
-                    attempts += 1
-                    continue
-                    
-                # 检查是否与现有点保持最小距离
-                if positions:  # 如果已经有点了
-                    too_close = False
-                    for i in range(0, len(positions), 2):
-                        existing_x, existing_y = positions[i], positions[i+1]
-                        distance = np.sqrt((x - existing_x)**2 + (y - existing_y)**2)
-                        if distance < min_distance_degree:
-                            too_close = True
-                            break
-                    
-                    if too_close:
-                        attempts += 1
-                        continue
-                
-                # 如果通过所有检查，添加这个点
-                positions.extend([x, y])
-                valid_position_found = True
+            # 方法2: 如果方法1失败，使用区域质心，并添加小扰动
+            centroid = self.region_geometry.centroid
+            return [
+                centroid.x + np.random.uniform(-0.01, 0.01),
+                centroid.y + np.random.uniform(-0.01, 0.01)
+            ]
+        
+        # 确保空间足够放置所有无人机
+        region_area = self.region_geometry.area
+        min_area_needed = self.drone_num * (np.pi * min_distance_degree**2)
+        if region_area < min_area_needed:
+            print(f"警告: 区域面积({region_area:.6f})可能不足以放置{self.drone_num}个无人机(最小所需面积:{min_area_needed:.6f})")
+            # 降低最小距离要求
+            min_distance_degree *= 0.5
+            print(f"降低最小距离要求为: {min_distance_degree * 111000:.0f}米")
+        
+        # 尝试生成无人机位置
+        max_placement_attempts = 30  # 每个无人机的最大尝试次数
+        print(f"开始生成{self.drone_num}个无人机位置，最小间距: {min_distance_degree * 111000:.0f}米")
+        
+        for i in range(self.drone_num):
+            point_added = False
+            attempts = 0
             
-            # 如果尝试次数过多，就在边界内随机取一点
-            if not valid_position_found:
-                print(f"警告: 为第{len(positions)//2 + 1}个无人机找不到合适位置，使用区域内随机点")
-                while True:
-                    # 在边界范围内随机生成一个点
-                    x = np.random.uniform(self.bounds[0], self.bounds[2])
-                    y = np.random.uniform(self.bounds[1], self.bounds[3])
-                    point = Point(x, y)
-                    
-                    # 确保至少在区域内
-                    if self.region_geometry.contains(point):
-                        positions.extend([x, y])
+            while not point_added and attempts < max_placement_attempts:
+                # 获取随机点
+                candidate = get_random_point_in_region()
+                
+                # 检查与现有点的最小距离
+                too_close = False
+                for j in range(0, len(positions), 2):
+                    distance = np.sqrt(
+                        (candidate[0] - positions[j])**2 + 
+                        (candidate[1] - positions[j+1])**2
+                    )
+                    if distance < min_distance_degree:
+                        too_close = True
                         break
+                
+                if not too_close:
+                    positions.extend(candidate)
+                    point_added = True
+                    print(f"  成功放置无人机 {i+1}: 经度={candidate[0]:.6f}, 纬度={candidate[1]:.6f}")
+                
+                attempts += 1
+            
+            # 如果经过多次尝试还是没有成功，就忽略最小距离限制
+            if not point_added:
+                print(f"警告: 无人机 {i+1} 无法满足最小距离要求，忽略距离限制")
+                candidate = get_random_point_in_region()
+                positions.extend(candidate)
+                print(f"  放置无人机 {i+1}: 经度={candidate[0]:.6f}, 纬度={candidate[1]:.6f}")
         
         print(f"成功生成{len(positions)//2}个无人机位置")
         return np.array(positions, dtype=np.float32)
@@ -195,18 +257,22 @@ class DroneEnvironment(gym.Env):
         drone_positions = self.state.reshape(-1, 2)
         
         # 构建无人机库的点
-        drone_points = [Point(pos[0], pos[1]) for pos in drone_positions]
-        
-        # 计算每个无人机库的覆盖范围 (buffer) - 注意单位转换
-        # GCJ-02坐标是经纬度，约1度=111km，所以需要将米转为度
-        drone_radius_degree = self.drone_radius / 111000  # 转换为度
-        drone_buffers = [point.buffer(drone_radius_degree) for point in drone_points]
+        drone_points = []
+        for pos in drone_positions:
+            point = Point(pos[0], pos[1])
+            drone_points.append(point)
         
         try:
             # 检查无人机库是否都在区域内
             for i, point in enumerate(drone_points):
                 if not self.region_geometry.contains(point):
                     print(f"警告: 无人机 {i+1} 不在区域边界内，坐标: {point.x}, {point.y}")
+                    print(f"  区域边界: {self.bounds}")
+            
+            # 计算每个无人机库的覆盖范围 (buffer) - 注意单位转换
+            # GCJ-02坐标是经纬度，约1度=111km，所以需要将米转为度
+            drone_radius_degree = self.drone_radius / 111000  # 转换为度
+            drone_buffers = [point.buffer(drone_radius_degree) for point in drone_points]
             
             # 合并所有覆盖范围
             merged_buffer = None
@@ -305,7 +371,7 @@ class DroneEnvironment(gym.Env):
             'poi_covered': poi_covered,
             'total_poi': len(self.poi_gdf),
             'drone_positions': drone_positions,
-            'drone_buffers': drone_buffers,
+            'drone_buffers': drone_buffers if 'drone_buffers' in locals() else None,
             'merged_buffer': merged_buffer if 'merged_buffer' in locals() else None
         }
         
