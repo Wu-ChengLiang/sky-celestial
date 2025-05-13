@@ -1,0 +1,314 @@
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌞 SkyCelestial 天枢 - AI选址系统</title>
+    <style>
+        :root {
+            --primary-bg: #f8f9fa; /* 主背景色 - 浅灰白 */
+            --sky-blue: #1e88e5; /* 主色调 - 明亮的天空蓝 */
+            --sunrise-orange: #fb8c00; /* 强调色 - 朝阳橙 */
+            --grass-green: #43a047; /* 辅助色 - 生机绿 */
+            --cloud-white: #ffffff; /* 白色 - 云朵白 */
+            --text-dark: #333333; /* 文字主色 - 深灰 */
+            --text-light: #666666; /* 文字辅助色 */
+        }
+
+        /* 动态效果 */
+        .drone-card:hover {
+            transform: translateY(-5px) scale(1.03);
+            box-shadow: 0 0 30px rgba(30, 136, 229, 0.3);
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .map-placeholder {
+            background: linear-gradient(135deg, 
+                rgba(30, 136, 229, 0.1),
+                rgba(67, 160, 71, 0.1));
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 0.8; }
+            100% { opacity: 0.5; }
+        }
+
+        /* 基础样式 */
+        body {
+            margin: 0;
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            color: var(--text-dark);
+            background-color: var(--primary-bg);
+            overflow-x: hidden;
+        }
+
+        /* 视差滚动容器 */
+        .parallax-container {
+            perspective: 1px;
+            height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+            scroll-snap-type: y mandatory;
+            background: linear-gradient(to bottom, 
+                var(--primary-bg) 0%, 
+                #e3f2fd 100%); /* 天空渐变背景 */
+        }
+
+        /* 阳光光斑动画 */
+        .sun-spots {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .sun-spot {
+            position: absolute;
+            background: radial-gradient(circle, 
+                rgba(251, 140, 0, 0.2) 0%, 
+                rgba(251, 140, 0, 0) 70%);
+            border-radius: 50%;
+            animation: float 15s infinite linear;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); opacity: 0.7; }
+            50% { transform: translate(50px, 50px) scale(1.2); opacity: 0.4; }
+            100% { transform: translate(0, 0) scale(1); opacity: 0.7; }
+        }
+
+        /* 内容区块 */
+        section {
+            position: relative;
+            min-height: 100vh;
+            padding: 5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            scroll-snap-align: start;
+            background-color: rgba(248, 249, 250, 0.85);
+            backdrop-filter: blur(5px);
+            border-radius: 16px;
+            margin: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        #title {
+            padding-top: 10vh;
+            text-align: center;
+            background: none;
+        }
+
+        h1 {
+            color: var(--sky-blue);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 三维可视化地图 */
+        #drone-map {
+            width: 100%;
+            height: 600px;
+            border-radius: 15px;
+            margin: 2rem auto;
+            position: relative;
+            overflow: hidden;
+            background: rgba(232, 245, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 1px solid rgba(30, 136, 229, 0.2);
+        }
+
+        #map-svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+            margin: 0 auto;
+        }
+
+        /* 算法流程可视化 */
+        .algorithm-viz {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+
+        .algorithm-step {
+            padding: 2rem;
+            background: rgba(232, 245, 255, 0.6);
+            border-radius: 12px;
+            border-left: 4px solid var(--sky-blue);
+            transition: all 0.3s;
+            color: var(--text-dark);
+        }
+
+        /* 选址结果展示 */
+        .location-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .location-card {
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 12px;
+            transition: all 0.3s;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            color: var(--text-dark);
+        }
+
+        .location-card:hover {
+            border-color: var(--sky-blue);
+        }
+
+        .location-preview {
+            height: 180px;
+            background: linear-gradient(135deg, 
+                rgba(30, 136, 229, 0.1), 
+                rgba(67, 160, 71, 0.1));
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            section {
+                padding: 2rem;
+                margin: 10px;
+                backdrop-filter: none;
+            }
+            
+            #drone-map {
+                height: 400px;
+            }
+            
+            .location-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="parallax-container">
+        <!-- 星轨背景 -->
+        <div class="stars" id="stars"></div>
+
+        <!-- 主内容区 -->
+        <section id="title">
+            <h1>🌌 SkyCelestial 天枢</h1>
+            <p>基于PPO强化学习的AI选址系统 | 北斗七星之首，指引空间决策</p>
+            
+            <!-- 三维地图可视化 -->
+            <div id="drone-map" class="map-placeholder">
+                <svg viewBox="0 0 800 500" id="map-svg">
+                    <!-- 此处可添加具体地图数据 -->
+                    <rect width="100%" height="100%" fill="transparent"/>
+                    <circle cx="400" cy="250" r="50" fill="var(--star-blue)"/>
+                </svg>
+            </div>
+        </section>
+
+        <!-- 技术实现 -->
+        <section id="technology">
+            <div class="algorithm-viz">
+                <div class="algorithm-step drone-card">
+                    <h3>动态空间建模</h3>
+                    <p>16维特征空间实时演化</p>
+                </div>
+                <div class="algorithm-step drone-card">
+                    <h3>PPO算法核心</h3>
+                    <p>近端策略优化迭代</p>
+                </div>
+                <div class="algorithm-step drone-card">
+                    <h3>奖励机制</h3>
+                    <p>多目标动态奖励函数</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 性能展示 -->
+        <section id="performance">
+            <div class="drone-card" style="padding: 2rem; text-align: center;">
+                <h2>92% POI覆盖率</h2>
+                <p>8个无人机库 | 8km服务半径</p>
+                <div id="coverage-chart"></div>
+            </div>
+        </section>
+        
+        <!-- 选址结果展示 -->
+        <section id="locations">
+            <h2>无人机库选址结果</h2>
+            <div class="location-grid">
+                <!-- 10个选址卡片 -->
+                <div class="location-card drone-card">
+                    <div class="location-preview"></div>
+                    <h3>选址点 #1</h3>
+                    <p>覆盖率: 92%</p>
+                    <p>服务半径: 8.2km</p>
+                </div>
+                <div class="location-card drone-card">
+                    <div class="location-preview"></div>
+                    <h3>选址点 #2</h3>
+                    <p>覆盖率: 89%</p>
+                    <p>服务半径: 7.8km</p>
+                </div>
+                <!-- 可以继续添加更多选址点... -->
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // 星空生成器
+        function createStars() {
+            const container = document.getElementById('stars');
+            for (let i = 0; i < 200; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.cssText = `
+                    width: ${Math.random() * 3}px;
+                    height: ${Math.random() * 3}px;
+                    left: ${Math.random() * 100}%;
+                    top: ${Math.random() * 100}%;
+                    animation-duration: ${2 + Math.random() * 3}s;
+                    animation-delay: ${Math.random() * 2}s;
+                `;
+                container.appendChild(star);
+            }
+        }
+        createStars();
+
+        // 动态地图交互
+        document.querySelectorAll('.drone-card').forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                card.style.transform = `
+                    perspective(1000px)
+                    rotateX(${(y - rect.height/2) / 10}deg)
+                    rotateY(${-(x - rect.width/2) / 10}deg)
+                `;
+            });
+
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'translateY(0) scale(1)';
+            });
+        });
+        
+        // 确保地球居中
+        window.addEventListener('resize', function() {
+            const map = document.getElementById('drone-map');
+            const svg = document.getElementById('map-svg');
+            if (map && svg) {
+                const rect = map.getBoundingClientRect();
+                svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+            }
+        });
+    </script>
+</body>
+</html>

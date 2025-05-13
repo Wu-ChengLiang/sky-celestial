@@ -1,0 +1,91 @@
+.mapContainer {
+  width: 100%;
+  height: 600px;
+  position: relative;
+  border-radius: 15px;
+  overflow: hidden;
+  background: rgba(232, 245, 255, 0.8);
+  border: 1px solid rgba(30, 136, 229, 0.2);
+  box-shadow: var(--card-shadow);
+  margin: 3rem auto;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.8s ease-in-out, transform 0.8s ease-in-out;
+}
+
+.mapContainer.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.mapTitle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 10px 20px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  z-index: 1000;
+  border-bottom: 1px solid rgba(30, 136, 229, 0.2);
+  text-align: center;
+}
+
+.mapDescription {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  color: var(--text-light);
+  z-index: 1000;
+  border-top: 1px solid rgba(30, 136, 229, 0.2);
+  text-align: center;
+}
+
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  background-color: rgba(248, 249, 250, 0.8);
+}
+
+.loadingSpinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid rgba(30, 136, 229, 0.2);
+  border-radius: 50%;
+  border-top-color: var(--sky-blue);
+  animation: spin 1s ease-in-out infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .mapContainer {
+    height: 400px;
+    margin: 2rem auto;
+  }
+  
+  .mapTitle {
+    font-size: 1rem;
+    padding: 8px 15px;
+  }
+  
+  .mapDescription {
+    font-size: 0.8rem;
+    padding: 8px 15px;
+  }
+} 

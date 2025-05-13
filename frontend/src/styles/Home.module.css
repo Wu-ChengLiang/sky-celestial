@@ -1,0 +1,343 @@
+.main {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* 英雄区域 */
+.hero {
+  height: 100vh;
+  width: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.heroContent {
+  position: absolute;
+  width: 100%;
+  max-width: 800px;
+  text-align: center;
+  z-index: 2;
+  padding: 0 2rem;
+  animation: fadeIn 1s ease-in-out;
+}
+
+.title {
+  font-size: 3.5rem;
+  margin-bottom: 1rem;
+  color: var(--text-dark);
+  font-weight: 700;
+  text-shadow: 0 2px 10px rgba(255, 255, 255, 0.7);
+}
+
+.subtitle {
+  font-size: 1.5rem;
+  margin-bottom: 2rem;
+  color: var(--text-light);
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.stats {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.statNumber {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--sky-blue);
+  margin-bottom: 0.5rem;
+}
+
+.statLabel {
+  font-size: 1rem;
+  color: var(--text-light);
+}
+
+.scrollPrompt {
+  position: absolute;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--text-light);
+  font-size: 0.9rem;
+  animation: bounce 2s infinite;
+}
+
+.scrollArrow {
+  width: 24px;
+  height: 24px;
+  fill: var(--sky-blue);
+  margin-top: 0.5rem;
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-10px);
+  }
+  60% {
+    transform: translateY(-5px);
+  }
+}
+
+/* 地图区域 */
+.mapSection {
+  padding: 4rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.sectionHeader {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.sectionHeader h2 {
+  font-size: 2.2rem;
+  color: var(--text-dark);
+  margin-bottom: 1rem;
+}
+
+.sectionHeader p {
+  font-size: 1.1rem;
+  color: var(--text-light);
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* 卡片区域 */
+.cardsSection {
+  padding: 4rem 2rem;
+  background-color: rgba(232, 245, 255, 0.3);
+}
+
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.cardWrapper {
+  height: 100%;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeInUp 0.6s forwards;
+}
+
+.cardsGrid .cardWrapper:nth-child(1) { animation-delay: 0.1s; }
+.cardsGrid .cardWrapper:nth-child(2) { animation-delay: 0.2s; }
+.cardsGrid .cardWrapper:nth-child(3) { animation-delay: 0.3s; }
+.cardsGrid .cardWrapper:nth-child(4) { animation-delay: 0.4s; }
+.cardsGrid .cardWrapper:nth-child(5) { animation-delay: 0.5s; }
+.cardsGrid .cardWrapper:nth-child(6) { animation-delay: 0.6s; }
+.cardsGrid .cardWrapper:nth-child(7) { animation-delay: 0.7s; }
+.cardsGrid .cardWrapper:nth-child(8) { animation-delay: 0.8s; }
+.cardsGrid .cardWrapper:nth-child(9) { animation-delay: 0.9s; }
+.cardsGrid .cardWrapper:nth-child(10) { animation-delay: 1s; }
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 算法说明区域 */
+.algorithmSection {
+  padding: 4rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.algorithmContent {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-top: 3rem;
+}
+
+.algorithmCard {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  height: 100%;
+}
+
+.algorithmCard h3 {
+  font-size: 1.3rem;
+  color: var(--text-dark);
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--sky-blue);
+}
+
+.algorithmCard p {
+  font-size: 1rem;
+  color: var(--text-light);
+  margin-bottom: 1.5rem;
+}
+
+.algorithmCard ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.algorithmCard li {
+  position: relative;
+  padding-left: 1.5rem;
+  margin-bottom: 0.8rem;
+  color: var(--text-dark);
+}
+
+.algorithmCard li:before {
+  content: "•";
+  color: var(--sky-blue);
+  font-size: 1.5rem;
+  position: absolute;
+  left: 0;
+  top: -0.3rem;
+}
+
+/* 联系区域 */
+.contactSection {
+  padding: 4rem 2rem;
+  background: linear-gradient(180deg, var(--primary-bg) 0%, rgba(232, 245, 255, 0.8) 100%);
+}
+
+.contactCard {
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: center;
+  padding: 3rem 2rem;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 15px;
+  box-shadow: var(--card-shadow);
+}
+
+.contactCard h2 {
+  font-size: 2rem;
+  color: var(--text-dark);
+  margin-bottom: 1rem;
+}
+
+.contactCard p {
+  font-size: 1.1rem;
+  color: var(--text-light);
+  margin-bottom: 2rem;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.contactButton {
+  padding: 0.8rem 2rem;
+  background-color: var(--sky-blue);
+  color: white;
+  border: none;
+  border-radius: 30px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.3s;
+  box-shadow: 0 4px 15px rgba(30, 136, 229, 0.3);
+}
+
+.contactButton:hover {
+  background-color: #1976d2;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(30, 136, 229, 0.4);
+}
+
+/* 页脚 */
+.footer {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-light);
+  background-color: white;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .title {
+    font-size: 2.5rem;
+  }
+  
+  .subtitle {
+    font-size: 1.2rem;
+  }
+  
+  .stats {
+    gap: 1rem;
+  }
+  
+  .statNumber {
+    font-size: 2rem;
+  }
+  
+  .sectionHeader h2 {
+    font-size: 1.8rem;
+  }
+  
+  .sectionHeader p {
+    font-size: 1rem;
+  }
+  
+  .mapSection, 
+  .cardsSection, 
+  .algorithmSection, 
+  .contactSection {
+    padding: 3rem 1rem;
+  }
+  
+  .cardsGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .contactCard {
+    padding: 2rem 1rem;
+  }
+  
+  .contactCard h2 {
+    font-size: 1.6rem;
+  }
+  
+  .contactCard p {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .title {
+    font-size: 2rem;
+  }
+  
+  .stats {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+} 

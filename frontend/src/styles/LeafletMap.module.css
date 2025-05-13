@@ -1,0 +1,72 @@
+.map {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* 使Leaflet适应组件容器 */
+.map :global(.leaflet-container) {
+  height: 100%;
+  width: 100%;
+}
+
+/* 选址站点标记样式 */
+.siteMarker {
+  background: transparent;
+  border: none;
+}
+
+.siteMarkerInner {
+  width: 20px;
+  height: 20px;
+  background-color: var(--grass-green);
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 0 2px var(--grass-green), 0 0 15px rgba(0, 0, 0, 0.2);
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 2px rgba(67, 160, 71, 0.7), 0 0 5px rgba(0, 0, 0, 0.1);
+  }
+  
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 5px rgba(67, 160, 71, 0), 0 0 10px rgba(0, 0, 0, 0.2);
+  }
+  
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 2px rgba(67, 160, 71, 0.7), 0 0 5px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* 弹出窗口样式 */
+.sitePopup h3 {
+  margin: 0 0 8px;
+  color: var(--text-dark);
+  font-size: 16px;
+}
+
+.sitePopup p {
+  margin: 4px 0;
+  color: var(--text-light);
+  font-size: 14px;
+}
+
+/* 确保弹出窗口在Leaflet地图中正常显示 */
+.map :global(.leaflet-popup-content-wrapper) {
+  border-radius: 8px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+.map :global(.leaflet-popup-content) {
+  margin: 10px 12px;
+  line-height: 1.4;
+}
+
+.map :global(.leaflet-popup-tip) {
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+} 

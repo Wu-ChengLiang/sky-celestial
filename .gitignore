@@ -47,3 +47,72 @@ result/visuals/
 __pycache__/configs.cpython-311.pyc
 result/visuals/eval_episode_1.png
 __pycache__/configs.cpython-311.pyc
+
+__pycache__/
+
+# 依赖目录
+node_modules/
+.pnpm/
+.yarn/
+.bin/
+
+# 构建产物
+dist/
+build/
+out/
+.next/
+.nuxt/
+.gatsby/
+.cache/
+.turbo/
+
+# 缓存文件
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+npm-debug.log*
+
+# 环境变量
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# IDE 和编辑器
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 测试覆盖率
+coverage/
+.nyc_output/
+
+# 调试日志
+debug.log
+
+# 包管理器锁文件
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+shrinkwrap.json
+
+# 临时文件
+*.tmp
+*.bak
+*.patch
+
+# 本地开发文件
+.local-*

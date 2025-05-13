@@ -25,7 +25,7 @@ class Config:
     LEARNING_RATE = 3e-4  # 学习率
     
     # 训练过程配置
-    EPOCHS = 10000  # 总训练轮次
+    EPOCHS = 1000  # 总训练轮次
     BATCH_SIZE = 64  # 批大小
     NUM_STEPS = 2048  # 每轮收集的步数
     NUM_MINI_BATCHES = 4  # 小批次数
