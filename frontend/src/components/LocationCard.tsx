@@ -36,7 +36,11 @@ const LocationCard: React.FC<LocationCardProps> = ({
           alt={`选址方案 #${index + 1}`}
           width={500}
           height={300}
-          layout="responsive"
+          style={{ 
+            width: '100%', 
+            height: 'auto', 
+            objectFit: 'cover' 
+          }}
           className={styles.image}
         />
         <div className={styles.coverageTag}>{coverage}</div>

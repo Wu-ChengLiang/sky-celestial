@@ -70,8 +70,8 @@
 
 .scrollPrompt {
   position: absolute;
-  bottom: 2rem;
-  left: 50%;
+  bottom: -13rem;
+  left: 42%;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -79,6 +79,8 @@
   color: var(--text-light);
   font-size: 0.9rem;
   animation: bounce 2s infinite;
+  
+
 }
 
 .scrollArrow {
