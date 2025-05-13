@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+
+.installed.cfg
+.venv
+venv/
+ENV/
+instance/
+.pytest_cache/
+.coverage
+htmlcov/
+
+/result/
+result/visuals/
+
+# React/Node.js
+
+
+# SQLite
+*.db
+*.db-journal
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 日志
+*.log 
+__pycache__/configs.cpython-311.pyc
+result/visuals/eval_episode_1.png
+__pycache__/configs.cpython-311.pyc
