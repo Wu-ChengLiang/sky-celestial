@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中国风水墨地球与流水</title>
+    <style>
+        body {
+            margin: 0;
+            overflow-x: hidden;
+            font-family: "Microsoft YaHei", sans-serif;
+            height: 300vh;
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        #three-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: -1;
+        }
+        
+        .content {
+            padding: 20px;
+            margin-top: 100vh;
+            background: rgba(245, 245, 245, 0.9);
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            border-radius: 5px;
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            color: #3a5169;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+        
+        p {
+            font-size: 1.1em;
+            line-height: 1.6;
+            text-align: justify;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.6.1/dist/gsap.min.js"></script>
+</head>
+<body>
+    <div id="three-container"></div>
+    <div class="content">
+        <h1>水墨丹青 · 天地流水</h1>
+        <p>向下滑动，观地球化作水墨流觞。灵感取自《大鱼海棠》的中国美学，将现代3D技术与传统水墨意境相融合。</p>
+    </div>
+
+    <script>
+        // 初始化Three.js场景
+        const threeContainer = document.getElementById('three-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf5f5f5);
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ 
+            antialias: true,
+            alpha: false
+        });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        threeContainer.appendChild(renderer.domElement);
+        
+        // 设置相机位置
+        camera.position.set(0, 0, 8);
+        
+        // 添加光源 - 更柔和的光照
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        directionalLight.position.set(3, 10, 5);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        scene.add(directionalLight);
+        
+        // 添加辅助光
+        const hemisphereLight = new THREE.HemisphereLight(0x4488bb, 0xcc8844, 0.3);
+        scene.add(hemisphereLight);
+        
+        // 创建更精美的地球
+        const createEarth = () => {
+            const textureLoader = new THREE.TextureLoader();
+            // 使用更高清的中国风地球纹理
+            const earthTexture = textureLoader.load('https://threejs.org/examples/textures/planets/earth_atmos_4096.jpg');
+            const bumpMap = textureLoader.load('https://threejs.org/examples/textures/planets/earth_normal_4096.jpg');
+            const specularMap = textureLoader.load('https://threejs.org/examples/textures/planets/earth_specular_4096.jpg');
+            
+            const geometry = new THREE.SphereGeometry(2.5, 128, 128);
+            const material = new THREE.MeshPhongMaterial({ 
+                map: earthTexture,
+                bumpMap: bumpMap,
+                bumpScale: 0.025,
+                specularMap: specularMap,
+                specular: new THREE.Color(0x333333),
+                shininess: 10,
+                transparent: true,
+                opacity: 1
+            });
+            
+            const earth = new THREE.Mesh(geometry, material);
+            earth.castShadow = true;
+            earth.receiveShadow = true;
+            
+            // 添加大气层效果
+            const atmosphereGeometry = new THREE.SphereGeometry(2.55, 128, 128);
+            const atmosphereMaterial = new THREE.MeshPhongMaterial({
+                color: 0x3399ff,
+                transparent: true,
+                opacity: 0.2,
+                side: THREE.BackSide
+            });
+            const atmosphere = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
+            earth.add(atmosphere);
+            
+            // 添加中国风水墨边框
+            const borderGeometry = new THREE.TorusGeometry(2.7, 0.05, 16, 100);
+            const borderMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0x3a5169,
+                transparent: true,
+                opacity: 0.8
+            });
+            const border = new THREE.Mesh(borderGeometry, borderMaterial);
+            border.rotation.x = Math.PI / 2;
+            earth.add(border);
+            
+            return earth;
+        };
+        
+        let earth = createEarth();
+        earth.position.x = -2; // 将地球放在左侧
+        scene.add(earth);
+        
+        // 创建中国风水流效果
+        const createWaterFlow = () => {
+            const group = new THREE.Group();
+            
+            // 主水流曲线
+            const curve = new THREE.CubicBezierCurve3(
+                new THREE.Vector3(-2, 3, 0),
+                new THREE.Vector3(-1, 1, 0.5),
+                new THREE.Vector3(1, -1, -0.5),
+                new THREE.Vector3(3, -3, 0)
+            );
+            
+            const points = curve.getPoints(50);
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            
+            // 水墨材质
+            const waterTexture = new THREE.TextureLoader().load('https://threejs.org/examples/textures/water.jpg');
+            const material = new THREE.MeshBasicMaterial({
+                color: 0x4488bb,
+                transparent: true,
+                opacity: 0,
+                map: waterTexture,
+                side: THREE.DoubleSide
+            });
+            
+            // 创建流动的水带
+            const waterStrip = new THREE.Mesh(
+                new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 100, 0.2, 20, false),
+                material
+            );
+            group.add(waterStrip);
+            
+            // 添加水墨粒子
+            const particleCount = 1000;
+            const particles = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+            const sizes = new Float32Array(particleCount);
+            
+            for (let i = 0; i < particleCount; i++) {
+                const t = Math.random();
+                const point = curve.getPoint(t);
+                
+                positions[i * 3] = point.x + (Math.random() - 0.5) * 0.5;
+                positions[i * 3 + 1] = point.y + (Math.random() - 0.5) * 0.5;
+                positions[i * 3 + 2] = point.z + (Math.random() - 0.5) * 0.5;
+                
+                // 水墨颜色渐变
+                colors[i * 3] = 0.2 + Math.random() * 0.2; // R
+                colors[i * 3 + 1] = 0.4 + Math.random() * 0.3; // G
+                colors[i * 3 + 2] = 0.6 + Math.random() * 0.3; // B
+                
+                sizes[i] = Math.random() * 0.3 + 0.1;
+            }
+            
+            particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            particles.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+            
+            const particleMaterial = new THREE.PointsMaterial({
+                size: 0.2,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0,
+                blending: THREE.AdditiveBlending
+            });
+            
+            const particleSystem = new THREE.Points(particles, particleMaterial);
+            group.add(particleSystem);
+            
+            // 存储动画所需数据
+            group.userData = {
+                waterStrip: waterStrip,
+                particleSystem: particleSystem,
+                opacity: 0,
+                targetOpacity: 0,
+                time: 0
+            };
+            
+            return group;
+        };
+        
+        let waterFlow = createWaterFlow();
+        scene.add(waterFlow);
+        
+        // 滚动控制
+        let lastScrollY = 0;
+        let scrollPercent = 0;
+        
+        window.addEventListener('scroll', () => {
+            const scrollY = window.scrollY;
+            scrollPercent = Math.min(scrollY / (window.innerHeight * 0.7), 1);
+            
+            // 平滑相机移动
+            camera.position.z = 8 - scrollPercent * 3;
+            camera.position.y = scrollPercent * 2;
+            
+            // 地球和水流过渡
+            if (scrollPercent < 0.3) {
+                // 第一阶段：只显示地球
+                earth.visible = true;
+                waterFlow.visible = false;
+                
+                // 地球自转
+                earth.rotation.y = scrollPercent * Math.PI * 2;
+            } else {
+                // 第二阶段：地球渐隐，水流渐显
+                earth.visible = true;
+                waterFlow.visible = true;
+                
+                const earthOpacity = THREE.MathUtils.lerp(1, 0, (scrollPercent - 0.3) / 0.4);
+                earth.material.opacity = earthOpacity;
+                earth.children[0].material.opacity = earthOpacity * 0.2; // 大气层
+                
+                const waterOpacity = THREE.MathUtils.lerp(0, 1, (scrollPercent - 0.3) / 0.4);
+                waterFlow.userData.targetOpacity = waterOpacity;
+                
+                if (scrollPercent > 0.7) {
+                    earth.visible = false;
+                }
+            }
+        });
+        
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // 动画循环
+        const animate = () => {
+            requestAnimationFrame(animate);
+            
+            // 地球自转
+            if (earth.visible) {
+                earth.rotation.y += 0.002;
+            }
+            
+            // 水流动画
+            if (waterFlow.visible) {
+                // 平滑过渡透明度
+                waterFlow.userData.opacity += (waterFlow.userData.targetOpacity - waterFlow.userData.opacity) * 0.1;
+                
+                waterFlow.userData.waterStrip.material.opacity = waterFlow.userData.opacity * 0.8;
+                waterFlow.userData.particleSystem.material.opacity = waterFlow.userData.opacity;
+                
+                // 粒子动画
+                waterFlow.userData.time += 0.01;
+                const positions = waterFlow.userData.particleSystem.geometry.attributes.position.array;
+                
+                for (let i = 0; i < positions.length; i += 3) {
+                    // 添加流动效果
+                    positions[i] += Math.sin(waterFlow.userData.time + i) * 0.01;
+                    positions[i + 1] -= 0.01;
+                    positions[i + 2] += Math.cos(waterFlow.userData.time + i) * 0.01;
+                    
+                    // 重置超出范围的粒子
+                    if (positions[i + 1] < -5) {
+                        positions[i + 1] = 3 + Math.random() * 2;
+                    }
+                }
+                
+                waterFlow.userData.particleSystem.geometry.attributes.position.needsUpdate = true;
+                
+                // 水流带动画
+                waterFlow.userData.waterStrip.geometry.dispose();
+                const curve = new THREE.CubicBezierCurve3(
+                    new THREE.Vector3(-2, 3, Math.sin(waterFlow.userData.time * 0.5) * 0.5),
+                    new THREE.Vector3(-1, 1, Math.sin(waterFlow.userData.time * 0.7) * 0.7),
+                    new THREE.Vector3(1, -1, Math.cos(waterFlow.userData.time * 0.6) * 0.6),
+                    new THREE.Vector3(3, -3, Math.sin(waterFlow.userData.time * 0.8) * 0.4)
+                );
+                const points = curve.getPoints(50);
+                waterFlow.userData.waterStrip.geometry = new THREE.TubeGeometry(
+                    new THREE.CatmullRomCurve3(points), 
+                    100, 
+                    0.2 + Math.sin(waterFlow.userData.time) * 0.05, 
+                    20, 
+                    false
+                );
+            }
+            
+            renderer.render(scene, camera);
+        };
+        
+        animate();
+    </script>
+</body>
+</html>

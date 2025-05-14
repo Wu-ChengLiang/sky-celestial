@@ -229,6 +229,29 @@
 .contactSection {
   padding: 4rem 2rem;
   background: linear-gradient(180deg, var(--primary-bg) 0%, rgba(232, 245, 255, 0.8) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.bgImage {
+  position: absolute;
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bgImageLeft {
+  left: 0;
+  bottom: 0;
+  max-width: 35%;
+  opacity: 0.1;
+}
+
+.bgImageRight {
+  right: 0;
+  top: 0;
+  max-width: 30%;
+  opacity: 0.1;
 }
 
 .contactCard {
@@ -239,6 +262,8 @@
   background: rgba(255, 255, 255, 0.9);
   border-radius: 15px;
   box-shadow: var(--card-shadow);
+  position: relative;
+  z-index: 1;
 }
 
 .contactCard h2 {
@@ -256,6 +281,13 @@
   margin-right: auto;
 }
 
+.contactButtons {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
 .contactButton {
   padding: 0.8rem 2rem;
   background-color: var(--sky-blue);
@@ -266,6 +298,15 @@
   cursor: pointer;
   transition: background-color 0.3s, transform 0.3s;
   box-shadow: 0 4px 15px rgba(30, 136, 229, 0.3);
+}
+
+.donateButton {
+  background-color: #ff9500;
+  box-shadow: 0 4px 15px rgba(255, 149, 0, 0.3);
+}
+
+.donateButton:hover {
+  background-color: #e08600;
 }
 
 .contactButton:hover {

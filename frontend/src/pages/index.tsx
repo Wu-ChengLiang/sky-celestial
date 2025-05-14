@@ -7,6 +7,7 @@ import styles from '@/styles/Home.module.css';
 const Earth = dynamic(() => import('@/components/Earth'), { ssr: false });
 const Map = dynamic(() => import('@/components/Map'), { ssr: false });
 const LocationCard = dynamic(() => import('@/components/LocationCard'), { ssr: false });
+const DonationModal = dynamic(() => import('@/components/DonationModal'), { ssr: false });
 
 // 站点数据
 const sitesData = [
@@ -35,6 +36,7 @@ const Home: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [scrollY, setScrollY] = useState(0);
   const locationCardsRef = useRef<HTMLDivElement>(null);
+  const [showDonationModal, setShowDonationModal] = useState(false);
 
   // 监听滚动
   useEffect(() => {
@@ -59,6 +61,16 @@ const Home: React.FC = () => {
     ? Math.min(scrollY / (document.body.scrollHeight - window.innerHeight), 1)
     : 0;
 
+  // 打开GitHub链接
+  const handleOpenGithub = () => {
+    window.open('https://github.com/Wu-ChengLiang/sky-celestial', '_blank');
+  };
+
+  // 显示赞赏模态框
+  const handleShowDonation = () => {
+    setShowDonationModal(true);
+  };
+
   // 先渲染所有组件，但根据loading状态决定显示哪个
   return (
     <>
@@ -77,7 +89,7 @@ const Home: React.FC = () => {
           <section className={styles.hero}>
             <Earth />
             <div className={styles.heroContent}>
-              <h1 className={styles.title}>无人机选址系统</h1>
+              <h1 className={styles.title}>Sky-Celestial天枢无人机选址系统</h1>
               <p className={styles.subtitle}>基于POI点密度分析与强化学习的最优选址方案</p>
               <div className={styles.stats}>
                 <div className={styles.stat}>
@@ -150,7 +162,7 @@ const Home: React.FC = () => {
               </div>
               <div className={styles.algorithmCard}>
                 <h3>强化学习模型</h3>
-                <p>基于深度Q-Network (DQN) 的站点选址优化</p>
+                <p>基于Proximal Policy Optimization(PPO)的站点选址优化</p>
                 <ul>
                   <li>状态空间: 富阳区栅格化地图</li>
                   <li>动作空间: 选择站点位置</li>
@@ -171,10 +183,19 @@ const Home: React.FC = () => {
 
           {/* 底部联系区域 */}
           <section className={styles.contactSection}>
+            <img src="/images/2.png" alt="Background" className={`${styles.bgImage} ${styles.bgImageLeft}`} />
+            <img src="/images/船渡.png" alt="Background" className={`${styles.bgImage} ${styles.bgImageRight}`} />
             <div className={styles.contactCard}>
               <h2>开始使用无人机选址系统</h2>
-              <p>我们的系统可适用于不同地区的无人机站点规划，提供定制化选址方案</p>
-              <button className={styles.contactButton}>联系我们</button>
+              <p>sky-celestial天枢完全免费开源，你可以修改配置文件根据特定场景再训练</p>
+              <div className={styles.contactButtons}>
+                <button className={styles.contactButton} onClick={handleOpenGithub}>
+                  下载开源代码
+                </button>
+                <button className={`${styles.contactButton} ${styles.donateButton}`} onClick={handleShowDonation}>
+                  赞赏作者工作
+                </button>
+              </div>
             </div>
           </section>
 
@@ -183,6 +204,12 @@ const Home: React.FC = () => {
           </footer>
         </main>
       )}
+
+      {/* 赞赏模态框 */}
+      <DonationModal 
+        isOpen={showDonationModal} 
+        onClose={() => setShowDonationModal(false)} 
+      />
     </>
   );
 };
