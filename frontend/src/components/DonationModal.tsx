@@ -13,8 +13,8 @@ const DonationModal: React.FC<DonationModalProps> = ({ isOpen, onClose }) => {
     <div className={styles.modalOverlay} onClick={onClose}>
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         <button className={styles.closeButton} onClick={onClose}>×</button>
-        <h2>¥5.20</h2>
-        <p>感谢你的支持 Thanks for donating</p>
+        <h3>Thanks for donating</h3>
+        <p>请你根据我的工作贡献适度打赏</p>
         <div className={styles.qrCodeContainer}>
           <img src="/images/donating.jpg" alt="Donation QR Code" className={styles.qrCode} />
         </div>
