@@ -5,6 +5,10 @@ import pandas as pd
 from shapely.geometry import Point, Polygon, MultiPolygon
 import gymnasium as gym
 from gymnasium import spaces
+import rasterio
+from rasterio.warp import transform
+from rasterio.transform import Affine
+from pyproj import Transformer
 
 class DroneEnvironment(gym.Env):
     """
@@ -23,6 +27,8 @@ class DroneEnvironment(gym.Env):
         self.config = config
         self.drone_num = config.DRONE_NUM
         self.drone_radius = config.DRONE_RADIUS
+        self.elevation_threshold = config.ELEVATION_THRESHOLD
+        self.elevation_penalty_weight = config.ELEVATION_PENALTY_WEIGHT
         
         # 加载区域边界数据 (GCJ-02坐标系)
         print(f"加载区域数据: {config.REGION_FILE}")
@@ -42,6 +48,19 @@ class DroneEnvironment(gym.Env):
             crs="EPSG:4326"  # 假设为WGS84，但实际数据为GCJ-02
         )
         print(f"加载POI点数量: {len(self.poi_gdf)}")
+        
+        # 加载DEM数据
+        print(f"加载DEM数据: {config.DEM_FILE}")
+        try:
+            self.dem_data = rasterio.open(config.DEM_FILE)
+            print(f"DEM数据加载成功，形状: {self.dem_data.shape}, CRS: {self.dem_data.crs}")
+            
+            # 创建坐标转换器 (GCJ-02 -> EPSG:4326，因为DEM通常是WGS84)
+            self.transformer = Transformer.from_crs("EPSG:4326", self.dem_data.crs.to_string(), always_xy=True)
+        except Exception as e:
+            print(f"加载DEM数据失败: {e}")
+            self.dem_data = None
+            self.transformer = None
         
         # 初始化动作空间和观察空间
         # 动作空间: 8个无人机库的坐标 (每个库2个坐标值)
@@ -251,6 +270,40 @@ class DroneEnvironment(gym.Env):
         print(f"成功生成{len(positions)//2}个无人机位置")
         return np.array(positions, dtype=np.float32)
     
+    def _get_elevation(self, lon, lat):
+        """
+        获取指定经纬度的海拔高度
+        
+        参数:
+            lon: 经度 (GCJ-02)
+            lat: 纬度 (GCJ-02)
+            
+        返回:
+            elevation: 海拔高度 (米)，如果无法获取则返回0
+        """
+        if self.dem_data is None:
+            return 0
+        
+        try:
+            # 转换坐标 (GCJ-02 -> DEM的坐标系统)
+            x, y = self.transformer.transform(lon, lat)
+            
+            # 将坐标转换为像素索引
+            row, col = self.dem_data.index(x, y)
+            
+            # 读取高程值
+            if 0 <= row < self.dem_data.height and 0 <= col < self.dem_data.width:
+                elevation = self.dem_data.read(1)[row, col]
+                # 检查是否为NODATA
+                if elevation == self.dem_data.nodata:
+                    return 0
+                return float(elevation)
+            else:
+                return 0
+        except Exception as e:
+            print(f"获取海拔高度时出错: {e}")
+            return 0
+    
     def _compute_reward(self):
         """
         计算奖励
@@ -264,9 +317,15 @@ class DroneEnvironment(gym.Env):
         
         # 构建无人机库的点
         drone_points = []
+        # 存储无人机海拔高度
+        drone_elevations = []
+        
         for pos in drone_positions:
             point = Point(pos[0], pos[1])
             drone_points.append(point)
+            # 获取无人机位置的海拔高度
+            elevation = self._get_elevation(pos[0], pos[1])
+            drone_elevations.append(elevation)
         
         try:
             # 检查无人机库是否都在区域内
@@ -334,14 +393,21 @@ class DroneEnvironment(gym.Env):
             
             poi_coverage_ratio = poi_covered / len(self.poi_gdf) if len(self.poi_gdf) > 0 else 0
             
-            # 计算奖励值 (根据覆盖率和重叠度)
+            # 计算海拔惩罚
+            elevation_penalty = 0
+            for elevation in drone_elevations:
+                if elevation > self.elevation_threshold:
+                    # 超过阈值，惩罚正比于超出部分
+                    elevation_penalty += (elevation - self.elevation_threshold) / 100  # 缩放系数
+            
+            # 计算奖励值 (根据覆盖率、重叠度和海拔惩罚)
             normalized_overlap = (overlap_area / region_area) if region_area > 0 else 0
             
             # 防止奖励值过大或过小
-            #这里可以自定义惩罚系数
             poi_term = poi_coverage_ratio * 1
             area_term = coverage_ratio * 0.3
             overlap_term = normalized_overlap * 0.1
+            elevation_term = elevation_penalty * self.elevation_penalty_weight
             
             # 确保各项值在合理范围内
             if np.isnan(poi_term) or np.isinf(poi_term):
@@ -355,8 +421,12 @@ class DroneEnvironment(gym.Env):
             if np.isnan(overlap_term) or np.isinf(overlap_term):
                 print(f"警告: 重叠度计算异常: {normalized_overlap}")
                 overlap_term = 0
+                
+            if np.isnan(elevation_term) or np.isinf(elevation_term):
+                print(f"警告: 海拔惩罚计算异常: {elevation_penalty}")
+                elevation_term = 0
             
-            reward = poi_term + area_term - overlap_term
+            reward = poi_term + area_term - overlap_term - elevation_term
             
             # 添加额外检查，确保奖励值在合理范围内
             if np.isnan(reward) or np.isinf(reward):
@@ -370,6 +440,8 @@ class DroneEnvironment(gym.Env):
             coverage_ratio = 0
             normalized_overlap = 0
             poi_covered = 0
+            elevation_penalty = 0
+            drone_elevations = [0] * len(drone_positions)
         
         info = {
             'poi_coverage': poi_coverage_ratio,
@@ -379,7 +451,9 @@ class DroneEnvironment(gym.Env):
             'total_poi': len(self.poi_gdf),
             'drone_positions': drone_positions,
             'drone_buffers': drone_buffers if 'drone_buffers' in locals() else None,
-            'merged_buffer': merged_buffer if 'merged_buffer' in locals() else None
+            'merged_buffer': merged_buffer if 'merged_buffer' in locals() else None,
+            'drone_elevations': drone_elevations if 'drone_elevations' in locals() else [0] * len(drone_positions),
+            'elevation_penalty': elevation_penalty if 'elevation_penalty' in locals() else 0
         }
         
         return reward, info

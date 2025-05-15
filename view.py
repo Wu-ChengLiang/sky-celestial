@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 import geopandas as gpd
 from shapely.geometry import Point, MultiPolygon, Polygon
+import rasterio
+from matplotlib.colors import LinearSegmentedColormap
 
 def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_path=None, info=None):
     """
@@ -28,8 +30,81 @@ def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_pa
     # 转换无人机覆盖半径(米)为经纬度
     drone_radius_degree = drone_radius / 111000  # 转为度
     
-    # 绘制行政区域
-    gpd.GeoSeries([region_geometry]).plot(ax=ax, color='lightblue', edgecolor='blue', alpha=0.5)
+    # 先绘制行政区域作为底图
+    gpd.GeoSeries([region_geometry]).plot(ax=ax, color='lightblue', edgecolor='blue', alpha=0.3)
+    
+    # 尝试获取配置和DEM数据以可视化海拔
+    dem_file = None
+    try:
+        from configs import Config
+        config = Config()
+        if os.path.exists(config.DEM_FILE):
+            dem_file = config.DEM_FILE
+    except Exception as e:
+        print(f"加载配置失败: {e}")
+    
+    # 绘制DEM数据
+    dem_shown = False
+    if dem_file:
+        try:
+            # 获取区域边界用于设置绘图范围
+            bounds = region_geometry.bounds  # (minx, miny, maxx, maxy)
+            
+            with rasterio.open(dem_file) as src:
+                # 读取DEM数据
+                dem_data = src.read(1)
+                
+                # 创建地形图配色方案 (低海拔为绿色，高海拔为棕色)
+                terrain_colors = {'green': '#267300', 'yellow': '#FFFF00', 'brown': '#A87000', 'white': '#FFFFFF'}
+                cmap = LinearSegmentedColormap.from_list('terrain', 
+                                                        [(0.0, terrain_colors['green']), 
+                                                         (0.3, terrain_colors['green']),
+                                                         (0.5, terrain_colors['yellow']),
+                                                         (0.7, terrain_colors['brown']),
+                                                         (1.0, terrain_colors['white'])])
+                
+                # 设置最小、最大值以增强对比度
+                vmin = max(0, np.nanmin(dem_data))
+                vmax = min(500, np.nanmax(dem_data))
+                
+                # 创建DEM数据的网格
+                rows, cols = dem_data.shape
+                
+                # 获取地理变换信息，用于将行列索引转换为地理坐标
+                transform = src.transform
+                xs = np.array([transform[0] + (col + 0.5) * transform[1] for col in range(cols)])
+                ys = np.array([transform[3] + (row + 0.5) * transform[5] for row in range(rows)])
+                
+                # 使用pcolormesh进行显示（比imshow更适合地理数据）
+                # 由于xs和ys可能很大，我们使用一个缩放系数来减少数据量
+                scale_factor = 10  # 减少10倍数据点
+                dem_plot = ax.pcolormesh(
+                    xs[::scale_factor], 
+                    ys[::scale_factor], 
+                    dem_data[::scale_factor, ::scale_factor],
+                    cmap=cmap, 
+                    vmin=vmin, 
+                    vmax=vmax, 
+                    alpha=0.4
+                )
+                
+                # 添加色条
+                cbar = plt.colorbar(dem_plot, ax=ax, label='海拔 (米)', shrink=0.5, pad=0.01)
+                
+                # 设置绘图区域范围与行政区域一致
+                ax.set_xlim(bounds[0], bounds[2])
+                ax.set_ylim(bounds[1], bounds[3])
+                
+                dem_shown = True
+                print(f"DEM显示成功，数据范围: {vmin}-{vmax}米")
+        except Exception as e:
+            print(f"绘制DEM数据失败: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    # 如果DEM绘制成功，增强行政区域边界的可见性
+    if dem_shown:
+        gpd.GeoSeries([region_geometry]).plot(ax=ax, color='none', edgecolor='blue', alpha=1.0, linewidth=2)
     
     # 检查drone_positions是否有效
     if drone_positions is None or len(drone_positions) == 0:
@@ -115,20 +190,41 @@ def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_pa
                     print(f"计算单一buffer交集时出错: {e}")
         except Exception as e:
             print(f"处理merged_buffer时出错: {e}")
-            
-    # 创建无人机点的GeoDataFrame并绘制
-    drone_gdf = gpd.GeoDataFrame(geometry=drone_points)
-    drone_gdf.plot(ax=ax, color='green', markersize=100, marker='x')
     
-    # 绘制POI点位
-    poi_gdf.plot(ax=ax, color='purple', markersize=20, marker='o')
+    # 获取海拔信息
+    drone_elevations = info.get('drone_elevations', [0] * len(drone_points)) if info else [0] * len(drone_points)
+    elevation_threshold = 50  # 默认阈值，如果有配置可以替换
+    try:
+        from configs import Config
+        elevation_threshold = Config.ELEVATION_THRESHOLD
+    except:
+        pass
+    
+    # 创建无人机点的GeoDataFrame并绘制，根据海拔使用不同颜色
+    drone_gdf = gpd.GeoDataFrame(geometry=drone_points)
+    # 添加海拔数据作为属性
+    drone_gdf['elevation'] = drone_elevations
+    
+    # 根据海拔分类绘制点: 低于阈值为绿色，高于阈值为红色
+    low_elevation_points = drone_gdf[drone_gdf['elevation'] <= elevation_threshold]
+    high_elevation_points = drone_gdf[drone_gdf['elevation'] > elevation_threshold]
+    
+    # 绘制低海拔和高海拔的点，增大点的大小和可见性
+    if not low_elevation_points.empty:
+        low_elevation_points.plot(ax=ax, color='green', markersize=150, marker='x', linewidth=3)
+    if not high_elevation_points.empty:
+        high_elevation_points.plot(ax=ax, color='red', markersize=150, marker='x', linewidth=3)
+    
+    # 绘制POI点位，调整大小以提高可见性
+    poi_gdf.plot(ax=ax, color='purple', markersize=30, marker='o')
     
     # 添加图例
     legend_elements = [
         Patch(facecolor='lightblue', edgecolor='blue', alpha=0.5, label='行政区域'),
         Patch(facecolor='red', alpha=0.3, label='无人机覆盖范围'),
         Patch(facecolor='blue', alpha=0.5, label='有效覆盖区域'),
-        plt.Line2D([], [], color='green', marker='x', linestyle='None', markersize=10, label='无人机点位'),
+        plt.Line2D([], [], color='green', marker='x', linestyle='None', markersize=10, label=f'无人机点位 (≤{elevation_threshold}米)'),
+        plt.Line2D([], [], color='red', marker='x', linestyle='None', markersize=10, label=f'无人机点位 (>{elevation_threshold}米)'),
         plt.Line2D([], [], color='purple', marker='o', linestyle='None', markersize=6, label='POI点位')
     ]
     ax.legend(handles=legend_elements, loc='upper right')
@@ -137,6 +233,7 @@ def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_pa
     coverage_ratio = info['poi_coverage'] * 100 if info and 'poi_coverage' in info else 0
     area_coverage = info['area_coverage'] * 100 if info and 'area_coverage' in info else 0
     overlap_ratio = info['overlap_ratio'] * 100 if info and 'overlap_ratio' in info else 0
+    elevation_penalty = info['elevation_penalty'] if info and 'elevation_penalty' in info else 0
     
     plt.title(f'无人机机库选址 (POI覆盖率: {coverage_ratio:.1f}%)')
     
@@ -144,10 +241,11 @@ def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_pa
     plt.xlabel('经度')
     plt.ylabel('纬度')
     
-    # 将点的坐标添加为标签
-    for i, point in enumerate(drone_points):
-        plt.annotate(f"D{i+1}", xy=(point.x, point.y), xytext=(5, 5), 
-                     textcoords='offset points', fontsize=8)
+    # 将点的坐标添加为标签，显示海拔信息
+    for i, (point, elev) in enumerate(zip(drone_points, drone_elevations)):
+        plt.annotate(f"D{i+1}\n{elev:.0f}m", xy=(point.x, point.y), xytext=(5, 5), 
+                     textcoords='offset points', fontsize=10, fontweight='bold',
+                     bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.7))
     
     # 添加覆盖信息文本
     info_text = (
@@ -155,7 +253,8 @@ def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_pa
         f'区域覆盖率: {area_coverage:.1f}%\n'
         f'重叠率: {overlap_ratio:.1f}%\n'
         f'覆盖POI点数: {info["poi_covered"] if info and "poi_covered" in info else 0}\n'
-        f'无人机数量: {len(drone_points)}'
+        f'无人机数量: {len(drone_points)}\n'
+        f'海拔惩罚: {elevation_penalty:.4f}'
     )
     plt.annotate(info_text, xy=(0.02, 0.02), xycoords='axes fraction', 
                  bbox=dict(boxstyle="round,pad=0.5", fc="white", alpha=0.8))
@@ -198,19 +297,39 @@ def visualize_training_progress(rewards, avg_rewards, output_path=None):
 if __name__ == "__main__":
     # 测试可视化模块
     from configs import Config
-    from env import DroneEnvironment
+    from env.drone_env import DroneEnvironment
+    import matplotlib.pyplot as plt
     
-    config = Config()
-    env = DroneEnvironment(config)
+    print("开始可视化测试...")
     
-    # 随机生成无人机库位置
-    state, _ = env.reset()
-    drone_positions = state.reshape(-1, 2)
+    try:
+        # 创建配置和环境
+        config = Config()
+        print(f"DEM文件路径: {config.DEM_FILE}")
+        env = DroneEnvironment(config)
+        
+        # 随机生成无人机库位置
+        state, _ = env.reset()
+        drone_positions = state.reshape(-1, 2)
+        
+        # 计算奖励和信息
+        reward, info = env._compute_reward()
+        
+        print(f"生成的无人机位置数量: {len(drone_positions)}")
+        print(f"POI覆盖率: {info['poi_coverage']*100:.2f}%")
+        print(f"区域覆盖率: {info['area_coverage']*100:.2f}%")
+        print(f"海拔惩罚: {info['elevation_penalty']:.4f}")
+        
+        # 可视化
+        print("生成测试可视化...")
+        visualize(env.region_geometry, env.poi_gdf, drone_positions, config.DRONE_RADIUS, "test_visualization.png", info)
+        
+        # 再次显示输出路径
+        print("可视化结果已保存到: test_visualization.png")
+        
+    except Exception as e:
+        import traceback
+        print(f"测试过程中出错: {e}")
+        traceback.print_exc()
     
-    # 计算奖励和信息
-    _, info = env._compute_reward()
-    
-    # 可视化
-    print("生成测试可视化...")
-    visualize(env.region_geometry, env.poi_gdf, drone_positions, config.DRONE_RADIUS, "test_visualization.png", info)
     print("可视化测试完成!") 

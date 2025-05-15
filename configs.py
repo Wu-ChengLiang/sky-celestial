@@ -6,7 +6,14 @@ class Config:
     DATA_PATH = 'data'
     POI_FILE = os.path.join(DATA_PATH, 'poi', '富阳区.csv')
     REGION_FILE = os.path.join(DATA_PATH, 'fuyang_json', '富阳区.json')
+    # DEM_FILE = os.path.join(DATA_PATH, 'dem', 'merged_dem.tif')
+    DEM_FILE = os.path.join(DATA_PATH, 'dem', 'ASTGTM_N29E119H.img')
     
+# 绘制DEM数据失败: 'Axes' object has no attribute 'get_array'
+
+    # 海拔相关配置
+    ELEVATION_THRESHOLD = 50  # 海拔阈值（米）
+    ELEVATION_PENALTY_WEIGHT = 0.2  # 海拔惩罚权重
 
     # 训练相关配置
     SEED = 42
@@ -33,7 +40,7 @@ class Config:
     NUM_MINI_BATCHES = 4  # 小批次数
     EVAL_INTERVAL = 10  # 评估间隔
     SAVE_INTERVAL = 100  # 保存模型间隔
-    VISUAL_INTERVAL = 100  # 可视化间隔
+    VISUAL_INTERVAL = 1  # 可视化间隔
     
     # 目录配置
     RESULT_DIR = 'result'
