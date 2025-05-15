@@ -20,18 +20,49 @@ def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_pa
         output_path: 输出路径
         info: 额外信息
     """
-    # 创建画布
-    fig, ax = plt.subplots(figsize=(12, 10))
+    # 创建画布，使用更大的尺寸以提高清晰度
+    fig, ax = plt.subplots(figsize=(14, 12), dpi=100)
     
     # 设置中文字体
-    plt.rcParams['font.sans-serif'] = ['SimHei']
+    import os
+    import matplotlib
+    
+    # 确保字体编码正确
+    matplotlib.rcParams['pdf.fonttype'] = 42
+    matplotlib.rcParams['ps.fonttype'] = 42
+    
+    # 设置中文字体，优先使用系统字体
+    if os.name == 'nt':  # Windows系统
+        font_list = ['SimHei', 'Microsoft YaHei', 'SimSun', 'FangSong', 'KaiTi']
+    else:  # Linux/Mac系统
+        font_list = ['WenQuanYi Zen Hei', 'Hiragino Sans GB', 'Heiti SC', 'STHeiti', 'Source Han Sans CN']
+    
+    plt.rcParams['font.sans-serif'] = font_list
     plt.rcParams['axes.unicode_minus'] = False
+    
+    # 中文显示问题  若非win，请自行配置
+    try:
+        from matplotlib.font_manager import fontManager
+        # 根据操作系统选择合适的字体路径
+        if os.name == 'nt':  # Windows系统
+            font_paths = ['C:\\Windows\\Fonts\\simhei.ttf', 'C:\\Windows\\Fonts\\msyh.ttc']
+            for path in font_paths:
+                if os.path.exists(path):
+                    fontManager.addfont(path)
+                    break
+    except Exception as e:
+        print(f"加载字体时出错: {e}")
+        # 回退方案：使用matplotlib内置的字体
+        plt.rcParams['font.family'] = 'sans-serif'
+    
+    # 设置更现代的风格
+    plt.style.use('seaborn-v0_8-whitegrid')
     
     # 转换无人机覆盖半径(米)为经纬度
     drone_radius_degree = drone_radius / 111000  # 转为度
     
-    # 先绘制行政区域作为底图
-    gpd.GeoSeries([region_geometry]).plot(ax=ax, color='lightblue', edgecolor='blue', alpha=0.3)
+    # 先绘制行政区域作为底图，使用更淡的颜色
+    gpd.GeoSeries([region_geometry]).plot(ax=ax, color='#E6F3FF', edgecolor='#6BAED6', alpha=0.2, linewidth=0.8)
     
     # 尝试获取配置和DEM数据以可视化海拔
     dem_file = None
@@ -77,7 +108,8 @@ def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_pa
                 
                 # 使用pcolormesh进行显示（比imshow更适合地理数据）
                 # 由于xs和ys可能很大，我们使用一个缩放系数来减少数据量
-                scale_factor = 10  # 减少10倍数据点
+                scale_factor = 8  # 减少8倍数据点，提高精度
+                # 设置zorder为1，确保DEM在底层显示
                 dem_plot = ax.pcolormesh(
                     xs[::scale_factor], 
                     ys[::scale_factor], 
@@ -85,11 +117,17 @@ def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_pa
                     cmap=cmap, 
                     vmin=vmin, 
                     vmax=vmax, 
-                    alpha=0.4
+                    alpha=0.5,
+                    zorder=1  # 设置较低的zorder确保在底层
                 )
                 
-                # 添加色条
-                cbar = plt.colorbar(dem_plot, ax=ax, label='海拔 (米)', shrink=0.5, pad=0.01)
+                # 添加色条，使用更现代的样式，调整位置和大小避免与经度标签重叠
+                cbar = plt.colorbar(dem_plot, ax=ax, label='海拔 (米)', shrink=0.35, pad=0.08, 
+                                   location='bottom', orientation='horizontal')
+                
+                # 调整色条标签字体大小，确保中文显示正常
+                cbar.ax.set_xlabel('海拔 (米)', fontsize=10, fontproperties='SimHei')
+                cbar.ax.tick_params(labelsize=9)
                 
                 # 设置绘图区域范围与行政区域一致
                 ax.set_xlim(bounds[0], bounds[2])
@@ -102,9 +140,11 @@ def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_pa
             import traceback
             traceback.print_exc()
     
-    # 如果DEM绘制成功，增强行政区域边界的可见性
+    # 如果DEM绘制成功，增强行政区域边界的可见性，使用更精致的样式
     if dem_shown:
-        gpd.GeoSeries([region_geometry]).plot(ax=ax, color='none', edgecolor='blue', alpha=1.0, linewidth=2)
+        # 使用更细腻的线条和更现代的颜色
+        gpd.GeoSeries([region_geometry]).plot(ax=ax, color='none', edgecolor='#3182bd', 
+                                           alpha=0.9, linewidth=1.2, zorder=6)
     
     # 检查drone_positions是否有效
     if drone_positions is None or len(drone_positions) == 0:
@@ -138,11 +178,11 @@ def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_pa
         print(f"计算新的buffer，点数: {len(drone_points)}")
         buffers = [point.buffer(drone_radius_degree) for point in drone_points]
     
-    # 绘制每个无人机覆盖范围，使用不同的透明度
+    # 绘制每个无人机覆盖范围，使用更精致的样式和适当的zorder
     for i, buffer in enumerate(buffers):
-        # 使用不同颜色或不同透明度
-        alpha = 0.3
-        gpd.GeoSeries([buffer]).plot(ax=ax, color='red', alpha=alpha)
+        # 使用半透明红色，细线条边框
+        gpd.GeoSeries([buffer]).plot(ax=ax, color='#ff9999', edgecolor='#e74c3c', 
+                                    alpha=0.25, linewidth=0.6, zorder=2)
     
     # 绘制有效覆盖区域（与行政区域的交集）
     merged_buffer = None
@@ -177,15 +217,19 @@ def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_pa
                             coverage_poly = MultiPolygon(valid_polys)
                         else:
                             coverage_poly = valid_polys[0]
-                        # 绘制有效覆盖区域
-                        gpd.GeoSeries([coverage_poly]).plot(ax=ax, color='blue', alpha=0.5)
+                        # 绘制有效覆盖区域，使用更精致的样式
+                        gpd.GeoSeries([coverage_poly]).plot(ax=ax, color='#6BAED6', 
+                                                          edgecolor='#3182bd', alpha=0.4, 
+                                                          linewidth=0.8, zorder=3)
                     except Exception as e:
                         print(f"绘制有效覆盖区域时出错: {e}")
             else:
                 try:
                     coverage_poly = merged_buffer.intersection(region_geometry)
                     if not coverage_poly.is_empty:
-                        gpd.GeoSeries([coverage_poly]).plot(ax=ax, color='blue', alpha=0.5)
+                        gpd.GeoSeries([coverage_poly]).plot(ax=ax, color='#6BAED6', 
+                                                          edgecolor='#3182bd', alpha=0.4, 
+                                                          linewidth=0.8, zorder=3)
                 except Exception as e:
                     print(f"计算单一buffer交集时出错: {e}")
         except Exception as e:
@@ -209,25 +253,36 @@ def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_pa
     low_elevation_points = drone_gdf[drone_gdf['elevation'] <= elevation_threshold]
     high_elevation_points = drone_gdf[drone_gdf['elevation'] > elevation_threshold]
     
-    # 绘制低海拔和高海拔的点，增大点的大小和可见性
+    # 绘制低海拔和高海拔的点，使用更专业的样式
     if not low_elevation_points.empty:
-        low_elevation_points.plot(ax=ax, color='green', markersize=150, marker='x', linewidth=3)
+        low_elevation_points.plot(ax=ax, color='#2ca02c', markersize=120, marker='o', linewidth=1.5, 
+                                 edgecolor='white', zorder=5)
     if not high_elevation_points.empty:
-        high_elevation_points.plot(ax=ax, color='red', markersize=150, marker='x', linewidth=3)
+        high_elevation_points.plot(ax=ax, color='#d62728', markersize=120, marker='o', linewidth=1.5, 
+                                  edgecolor='white', zorder=5)
     
-    # 绘制POI点位，调整大小以提高可见性
-    poi_gdf.plot(ax=ax, color='purple', markersize=30, marker='o')
+    # 绘制POI点位，使用更精致的样式
+    poi_gdf.plot(ax=ax, color='#9467bd', markersize=25, marker='o', edgecolor='white', linewidth=0.8, 
+                alpha=0.8, zorder=4)
     
-    # 添加图例
+    # 添加图例，使用更现代的样式
+    from matplotlib.font_manager import FontProperties
+    font_prop = FontProperties(family='SimHei')
+    
     legend_elements = [
-        Patch(facecolor='lightblue', edgecolor='blue', alpha=0.5, label='行政区域'),
+        Patch(facecolor='#E6F3FF', edgecolor='#6BAED6', alpha=0.5, label='行政区域'),
         Patch(facecolor='red', alpha=0.3, label='无人机覆盖范围'),
-        Patch(facecolor='blue', alpha=0.5, label='有效覆盖区域'),
-        plt.Line2D([], [], color='green', marker='x', linestyle='None', markersize=10, label=f'无人机点位 (≤{elevation_threshold}米)'),
-        plt.Line2D([], [], color='red', marker='x', linestyle='None', markersize=10, label=f'无人机点位 (>{elevation_threshold}米)'),
-        plt.Line2D([], [], color='purple', marker='o', linestyle='None', markersize=6, label='POI点位')
+        Patch(facecolor='#6BAED6', alpha=0.5, label='有效覆盖区域'),
+        plt.Line2D([], [], color='#2ca02c', marker='o', markeredgecolor='white', linestyle='None', 
+                  markersize=8, label=f'无人机点位 (≤{elevation_threshold}米)'),
+        plt.Line2D([], [], color='#d62728', marker='o', markeredgecolor='white', linestyle='None', 
+                  markersize=8, label=f'无人机点位 (>{elevation_threshold}米)'),
+        plt.Line2D([], [], color='#9467bd', marker='o', markeredgecolor='white', linestyle='None', 
+                  markersize=6, label='POI点位')
     ]
-    ax.legend(handles=legend_elements, loc='upper right')
+    # 调整图例位置，避免与其他元素重叠，并设置中文字体
+    ax.legend(handles=legend_elements, loc='upper right', framealpha=0.9, edgecolor='#cccccc', 
+             bbox_to_anchor=(0.98, 0.98), prop=font_prop)
     
     # 添加标题和信息
     coverage_ratio = info['poi_coverage'] * 100 if info and 'poi_coverage' in info else 0
@@ -235,19 +290,24 @@ def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_pa
     overlap_ratio = info['overlap_ratio'] * 100 if info and 'overlap_ratio' in info else 0
     elevation_penalty = info['elevation_penalty'] if info and 'elevation_penalty' in info else 0
     
-    plt.title(f'无人机机库选址 (POI覆盖率: {coverage_ratio:.1f}%)')
+    # 设置标题，确保中文正确显示
+    plt.title(f'无人机机库选址 (POI覆盖率: {coverage_ratio:.1f}%)', fontsize=14, pad=10, fontproperties='SimHei')
     
-    # 添加坐标轴标签
-    plt.xlabel('经度')
-    plt.ylabel('纬度')
+    # 添加坐标轴标签，确保中文正确显示
+    plt.xlabel('经度', fontsize=12, fontproperties='SimHei')
+    plt.ylabel('纬度', fontsize=12, fontproperties='SimHei')
     
-    # 将点的坐标添加为标签，显示海拔信息
+    # 调整坐标轴标签位置，避免与图例重叠
+    ax.xaxis.set_label_coords(0.5, -0.08)
+    
+    # 将点的坐标添加为标签，显示海拔信息，使用更精致的样式
     for i, (point, elev) in enumerate(zip(drone_points, drone_elevations)):
-        plt.annotate(f"D{i+1}\n{elev:.0f}m", xy=(point.x, point.y), xytext=(5, 5), 
-                     textcoords='offset points', fontsize=10, fontweight='bold',
-                     bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.7))
+        plt.annotate(f"D{i+1}\n{elev:.0f}m", xy=(point.x, point.y), xytext=(7, 7), 
+                     textcoords='offset points', fontsize=9, fontweight='bold',
+                     bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="#cccccc", alpha=0.85),
+                     zorder=10)
     
-    # 添加覆盖信息文本
+    # 添加覆盖信息文本，移到右下角并使用半透明背景，确保不遮挡DEM
     info_text = (
         f'POI覆盖率: {coverage_ratio:.1f}%\n'
         f'区域覆盖率: {area_coverage:.1f}%\n'
@@ -256,8 +316,10 @@ def visualize(region_geometry, poi_gdf, drone_positions, drone_radius, output_pa
         f'无人机数量: {len(drone_points)}\n'
         f'海拔惩罚: {elevation_penalty:.4f}'
     )
-    plt.annotate(info_text, xy=(0.02, 0.02), xycoords='axes fraction', 
-                 bbox=dict(boxstyle="round,pad=0.5", fc="white", alpha=0.8))
+    plt.annotate(info_text, xy=(0.98, 0.02), xycoords='axes fraction', 
+                 xytext=(-10, 10), textcoords='offset points',
+                 bbox=dict(boxstyle="round,pad=0.5", fc="white", ec="#cccccc", alpha=0.85),
+                 ha='right', va='bottom', zorder=20, fontproperties=font_prop)
     
     # 保存或显示图形
     if output_path:
@@ -299,6 +361,7 @@ if __name__ == "__main__":
     from configs import Config
     from env.drone_env import DroneEnvironment
     import matplotlib.pyplot as plt
+    import os
     
     print("开始可视化测试...")
     
@@ -320,16 +383,21 @@ if __name__ == "__main__":
         print(f"区域覆盖率: {info['area_coverage']*100:.2f}%")
         print(f"海拔惩罚: {info['elevation_penalty']:.4f}")
         
+        # 创建输出目录
+        output_dir = "output"
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, "test_visualization.png")
+        
         # 可视化
         print("生成测试可视化...")
-        visualize(env.region_geometry, env.poi_gdf, drone_positions, config.DRONE_RADIUS, "test_visualization.png", info)
+        visualize(env.region_geometry, env.poi_gdf, drone_positions, config.DRONE_RADIUS, output_path, info)
         
         # 再次显示输出路径
-        print("可视化结果已保存到: test_visualization.png")
+        print(f"可视化结果已保存到: {output_path}")
         
     except Exception as e:
         import traceback
         print(f"测试过程中出错: {e}")
         traceback.print_exc()
     
-    print("可视化测试完成!") 
+    print("可视化测试完成!")

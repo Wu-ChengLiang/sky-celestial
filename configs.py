@@ -7,7 +7,7 @@ class Config:
     POI_FILE = os.path.join(DATA_PATH, 'poi', '富阳区.csv')
     REGION_FILE = os.path.join(DATA_PATH, 'fuyang_json', '富阳区.json')
     # DEM_FILE = os.path.join(DATA_PATH, 'dem', 'merged_dem.tif')
-    DEM_FILE = os.path.join(DATA_PATH, 'dem', 'ASTGTM_N29E119H.img')
+    DEM_FILE = os.path.join(DATA_PATH, 'dem', 'merged_specific_dem.img')
     
 # 绘制DEM数据失败: 'Axes' object has no attribute 'get_array'
 
