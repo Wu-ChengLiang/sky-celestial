@@ -7,6 +7,7 @@ class Config:
     POI_FILE = os.path.join(DATA_PATH, 'poi', '富阳区.csv')
     REGION_FILE = os.path.join(DATA_PATH, 'fuyang_json', '富阳区.json')
     
+
     # 训练相关配置
     SEED = 42
     DRONE_NUM = 8  # 无人机库数量
@@ -25,13 +26,14 @@ class Config:
     LEARNING_RATE = 3e-4  # 学习率
     
     # 训练过程配置
-    EPOCHS = 1000  # 总训练轮次
+    EPOCHS = 500  # 总训练轮次
     BATCH_SIZE = 64  # 批大小
-    NUM_STEPS = 2048  # 每轮收集的步数
+    # NUM_STEPS = 2048  # 每轮收集的步数
+    NUM_STEPS = 1000  # 每轮收集的步数
     NUM_MINI_BATCHES = 4  # 小批次数
     EVAL_INTERVAL = 10  # 评估间隔
     SAVE_INTERVAL = 100  # 保存模型间隔
-    VISUAL_INTERVAL = 1000  # 可视化间隔
+    VISUAL_INTERVAL = 100  # 可视化间隔
     
     # 目录配置
     RESULT_DIR = 'result'
