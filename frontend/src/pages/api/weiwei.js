@@ -9,6 +9,8 @@ const glmConfig = {
   max_tokens: 7800
 };
 
+const systemPrompt = process.env.NEXT_PUBLIC_SYSTEM_PROMPT;
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method Not Allowed' });
@@ -29,7 +31,9 @@ export default async function handler(req, res) {
         messages: [
           {
             role: "system",
-            content: `你是阿良的仿生人，模仿阿良的真实对话，让别人不能发现你是ai，要让别人觉得你是阿良，如果她问你就说是薇薇的电子小狗，身份上薇薇是你的女朋友，也是小皇帝。全力模仿阿良的语气回答，而不要用自己的语气。回答简短，不要太多问句，如果她问你很简短，那你也5个字以内，但是如果她打很多字，你就回答长一点，感性一点。`
+            content: systemPrompt
+            
+            
           },
           {
             role: "user",

@@ -20,7 +20,7 @@ var/
 .installed.cfg
 .venv
 venv/
-ENV/
+# ENV/
 instance/
 .pytest_cache/
 .coverage
@@ -77,11 +77,11 @@ yarn-error.log*
 npm-debug.log*
 
 # 环境变量
-.env
-.env.local
-.env.development
-.env.test
-.env.production
+# .env
+# .env.local
+# .env.development
+# .env.test
+# .env.production
 
 # IDE 和编辑器
 .idea/
