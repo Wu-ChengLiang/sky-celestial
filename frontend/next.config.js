@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     reactStrictMode: true,
-    output: 'export',
     images: {
       unoptimized: true, // 必须添加！禁用图片优化
       domains: [], // 保留空数组

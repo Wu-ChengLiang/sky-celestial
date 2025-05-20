@@ -306,7 +306,20 @@
 }
 
 .donateButton:hover {
-  background-color: #e08600;
+  background-color: #e55b7a;
+}
+
+.weiweiButton {
+  background-color: #7046f8;
+  color: white;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.weiweiButton:hover {
+  background-color: #5e38d8;
 }
 
 .contactButton:hover {

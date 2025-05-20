@@ -198,6 +198,8 @@ const Home: React.FC = () => {
               </div>
             </div>
           </section>
+          
+          <section className={styles.contactSection}> </section>
 
           <footer className={styles.footer}>
             <p>无人机选址系统 &copy; {new Date().getFullYear()} - 基于POI点密度分析与强化学习</p>
